@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "llm-context"
+version = "0.1.0"
+description = "Analyze any codebase, find the most relevant files to your question, and build LLM-ready context blocks."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "llm-context contributors"},
+]
+keywords = ["llm", "context", "codebase", "ai", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "click>=8.0",
+    "tiktoken>=0.5",
+    "pyperclip>=1.8",
+    "openai>=1.0",
+    "anthropic>=0.18",
+    "google-generativeai>=0.4",
+    "requests>=2.28",
+    "scikit-learn>=1.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+llm-context = "llm_context.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/llm-context/llm-context"
+Repository = "https://github.com/llm-context/llm-context"
+Issues = "https://github.com/llm-context/llm-context/issues"
+
+[tool.setuptools.packages.find]
+include = ["llm_context*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
