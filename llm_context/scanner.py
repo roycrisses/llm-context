@@ -67,6 +67,8 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "db", "sqlite", "sqlite3",
         # Compiled
         "pyc", "pyo", "class",
+        # Security / Sensitive
+        "key", "pem", "crt", "cer", "der", "p12", "pfx", "jks", "keystore",
     }
 )
 
@@ -86,6 +88,11 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         "Cargo.lock",
         "composer.lock",
         "Gemfile.lock",
+        # Security / Sensitive
+        "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
+        ".htpasswd", ".netrc", ".npmrc", ".pypirc",
+        ".history", ".zsh_history", ".bash_history",
+        ".secret", ".secrets",
     }
 )
 
