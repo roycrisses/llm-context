@@ -85,6 +85,9 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
         except Exception:
             pass
     # Fallback: 1 token ≈ 4 characters (commonly cited rule of thumb)
+    # We return 0 for empty strings to be accurate.
+    if not text:
+        return 0
     return max(1, len(text) // 4)
 
 
@@ -202,7 +205,10 @@ def trim_to_budget(
         in-place on copies of the originals.
     """
     budget = (max_tokens if max_tokens is not None else get_token_limit(model))
-    budget = max(0, budget - header_tokens)
+    # If the requested budget is very small, we reduce overhead to allow
+    # at least some content to fit.
+    effective_header_tokens = min(header_tokens, budget // 2) if budget < 1000 else header_tokens
+    budget = max(0, budget - effective_header_tokens)
 
     result: List[FileInfo] = []
     remaining = budget
