@@ -5,9 +5,7 @@ tests/test_trimmer.py — Unit tests for llm_context.trimmer
 from __future__ import annotations
 
 import time
-from typing import List
 
-import pytest
 
 from llm_context.scanner import FileInfo
 from llm_context.trimmer import (
@@ -54,9 +52,8 @@ class TestCountTokens:
         assert isinstance(result, int)
         assert result > 0
 
-    def test_empty_string_returns_at_least_one(self):
-        # Our implementation uses max(1, ...)
-        assert count_tokens("") >= 1
+    def test_empty_string_returns_zero(self):
+        assert count_tokens("") == 0
 
     def test_longer_text_has_more_tokens(self):
         short = count_tokens("hi")

@@ -5,7 +5,6 @@ tests/test_ranker.py — Unit tests for llm_context.ranker
 from __future__ import annotations
 
 import time
-from typing import List
 
 import pytest
 

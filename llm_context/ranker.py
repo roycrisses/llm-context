@@ -31,7 +31,7 @@ def _tokenize(text: str) -> List[str]:
     expanded: List[str] = []
     for tok in raw:
         # Also split camelCase / snake_case into sub-tokens
-        parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
+        parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).replace("_", " ").split()
         expanded.extend(p.lower() for p in parts)
         expanded.append(tok)
     return expanded
