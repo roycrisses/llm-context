@@ -219,6 +219,11 @@ def _iter_files(
 
         for filename in filenames:
             filepath = current_dir / filename
+
+            # Security: Skip symbolic links to prevent path traversal outside the root
+            if filepath.is_symlink():
+                continue
+
             try:
                 rel_path = str(filepath.relative_to(root))
             except ValueError:
