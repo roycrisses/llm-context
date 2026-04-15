@@ -27,13 +27,24 @@ def _tokenize(text: str) -> List[str]:
     Extract lowercase alphanumeric tokens from *text*.
     Splits on punctuation, whitespace, and underscores intelligently.
     """
-    raw = _TOKEN_RE.findall(text.lower())
+    # Don't lower yet, we need cases for camelCase splitting
+    raw = _TOKEN_RE.findall(text)
     expanded: List[str] = []
     for tok in raw:
-        # Also split camelCase / snake_case into sub-tokens
-        parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
-        expanded.extend(p.lower() for p in parts)
-        expanded.append(tok)
+        # Split camelCase and snake_case: "AuthService" -> "Auth Service", "auth_login" -> "auth login"
+        with_spaces = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).replace("_", " ")
+        parts = with_spaces.split()
+
+        for p in parts:
+            expanded.append(p.lower())
+
+        # If it was a compound token, also keep the full lowercase version
+        tok_lower = tok.lower()
+        if len(parts) > 1:
+            expanded.append(tok_lower)
+        elif not parts and tok:
+            expanded.append(tok_lower)
+
     return expanded
 
 
@@ -73,12 +84,23 @@ def _compute_tfidf_scores(
         combined = f["rel_path"] + " " + f["content"]
         doc_tokens.append(_tokenize(combined))
 
-    # Document frequency for query terms only (faster)
+    # Pre-calculate document sets for faster DF computation
+    doc_sets = [set(tokens) for tokens in doc_tokens]
+
+    # Document frequency for query terms only (O(N * avg_doc_len + Q * N))
     df: dict[str, int] = {}
     for term in query_terms:
-        for tokens in doc_tokens:
-            if term in tokens:
-                df[term] = df.get(term, 0) + 1
+        count = 0
+        for dset in doc_sets:
+            if term in dset:
+                count += 1
+        df[term] = count
+
+    # Pre-calculate IDF for query terms
+    idf_map: dict[str, float] = {}
+    for term in query_terms:
+        # Smoothed IDF
+        idf_map[term] = math.log((n_docs + 1) / (df.get(term, 0) + 1)) + 1.0
 
     scores: List[float] = []
     for tokens in doc_tokens:
@@ -89,11 +111,8 @@ def _compute_tfidf_scores(
             raw_tf = tf.get(term, 0)
             if raw_tf == 0:
                 continue
-            # Normalised TF
-            normalised_tf = raw_tf / doc_len
-            # Smoothed IDF
-            idf = math.log((n_docs + 1) / (df.get(term, 0) + 1)) + 1.0
-            score += normalised_tf * idf
+            # Normalised TF * Pre-calculated IDF
+            score += (raw_tf / doc_len) * idf_map[term]
         scores.append(score)
 
     return scores
@@ -111,8 +130,8 @@ def _filename_boost(rel_path: str, query_terms: List[str]) -> float:
     Return a small additive boost when the file name contains one or more
     query keywords.  Prioritises exact stem matches.
     """
-    stem = os.path.splitext(os.path.basename(rel_path))[0].lower()
-    stem_tokens = _tokenize(stem)
+    stem = os.path.splitext(os.path.basename(rel_path))[0]
+    stem_tokens = set(_tokenize(stem))
     hits = sum(1 for t in query_terms if t in stem_tokens)
     return 0.15 * hits
 
