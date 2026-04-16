@@ -27,13 +27,24 @@ def _tokenize(text: str) -> List[str]:
     Extract lowercase alphanumeric tokens from *text*.
     Splits on punctuation, whitespace, and underscores intelligently.
     """
-    raw = _TOKEN_RE.findall(text.lower())
+    # We don't lower() immediately to preserve camelCase patterns
+    raw = _TOKEN_RE.findall(text)
     expanded: List[str] = []
     for tok in raw:
-        # Also split camelCase / snake_case into sub-tokens
-        parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
-        expanded.extend(p.lower() for p in parts)
-        expanded.append(tok)
+        # Split camelCase (e.g., AuthService -> Auth Service)
+        camel_split = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok)
+        # Split on underscores and whitespace
+        parts = camel_split.replace("_", " ").split()
+
+        for p in parts:
+            if p:
+                expanded.append(p.lower())
+
+        # Also include the full original token in lowercase
+        low_tok = tok.lower()
+        if low_tok not in expanded:
+            expanded.append(low_tok)
+
     return expanded
 
 

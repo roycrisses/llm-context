@@ -78,6 +78,9 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     int
         Estimated token count.
     """
+    if not text:
+        return 0
+
     enc = _get_tiktoken_encoder(model)
     if enc is not None:
         try:
@@ -202,6 +205,12 @@ def trim_to_budget(
         in-place on copies of the originals.
     """
     budget = (max_tokens if max_tokens is not None else get_token_limit(model))
+
+    # If the user-supplied budget is very small, we skip the overhead reservation
+    # to avoid exhausting the budget before we even include a single file.
+    if max_tokens is not None and max_tokens <= header_tokens:
+        header_tokens = 0
+
     budget = max(0, budget - header_tokens)
 
     result: List[FileInfo] = []
