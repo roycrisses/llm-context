@@ -86,6 +86,11 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         "Cargo.lock",
         "composer.lock",
         "Gemfile.lock",
+        # Shell history
+        ".bash_history",
+        ".zsh_history",
+        ".zsh_sessions",
+        ".history",
     }
 )
 
@@ -219,6 +224,12 @@ def _iter_files(
 
         for filename in filenames:
             filepath = current_dir / filename
+
+            # Security: Skip all symbolic links to prevent path traversal
+            # and accidental leakage of files outside the project root.
+            if filepath.is_symlink():
+                continue
+
             try:
                 rel_path = str(filepath.relative_to(root))
             except ValueError:
