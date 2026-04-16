@@ -5,9 +5,7 @@ tests/test_trimmer.py — Unit tests for llm_context.trimmer
 from __future__ import annotations
 
 import time
-from typing import List
 
-import pytest
 
 from llm_context.scanner import FileInfo
 from llm_context.trimmer import (
@@ -144,7 +142,8 @@ class TestTrimToBudget:
     def test_large_single_file_is_truncated_not_dropped(self):
         huge_content = big_content(1000)
         files = [make_file("big.py", huge_content)]
-        result = trim_to_budget(files, model="gpt-4o", max_tokens=200)
+        # Pass header_tokens=0 so the 200 budget isn't wiped out by 512 default overhead
+        result = trim_to_budget(files, model="gpt-4o", max_tokens=200, header_tokens=0)
         # The file should be included but with truncated content
         assert len(result) == 1
         assert len(result[0]["content"]) < len(huge_content)
