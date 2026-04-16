@@ -27,13 +27,22 @@ def _tokenize(text: str) -> List[str]:
     Extract lowercase alphanumeric tokens from *text*.
     Splits on punctuation, whitespace, and underscores intelligently.
     """
-    raw = _TOKEN_RE.findall(text.lower())
+    # Find tokens BEFORE lowercasing to preserve camelCase boundaries
+    raw = _TOKEN_RE.findall(text)
     expanded: List[str] = []
     for tok in raw:
-        # Also split camelCase / snake_case into sub-tokens
-        parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
-        expanded.extend(p.lower() for p in parts)
-        expanded.append(tok)
+        # Optimization: process only if it has camelCase or snake_case
+        if "_" in tok or any(c.isupper() for c in tok):
+            # Split camelCase (e.g., getUserName -> get User Name)
+            parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
+            for p in parts:
+                if "_" in p:
+                    expanded.extend(sub.lower() for sub in p.split("_") if sub)
+                else:
+                    expanded.append(p.lower())
+
+        expanded.append(tok.lower())
+
     return expanded
 
 
@@ -68,32 +77,42 @@ def _compute_tfidf_scores(
         return []
 
     # Tokenize documents (path + content)
-    doc_tokens: List[List[str]] = []
-    for f in files:
-        combined = f["rel_path"] + " " + f["content"]
-        doc_tokens.append(_tokenize(combined))
+    # We use sets for DF calculation to speed up O(Q*N*L) -> O(N*L + Q*N)
+    # and pre-calculate TF for query terms to avoid extra work in scoring loop
+    doc_tfs: List[dict[str, int]] = []
+    doc_lens: List[int] = []
+    df: dict[str, int] = {term: 0 for term in query_terms}
 
-    # Document frequency for query terms only (faster)
-    df: dict[str, int] = {}
+    for f in files:
+        tokens = _tokenize(f["rel_path"] + " " + f["content"])
+        doc_len = max(len(tokens), 1)
+        doc_lens.append(doc_len)
+
+        # Only count TF for query terms to save memory/time
+        tf_map: dict[str, int] = {}
+        tokens_set = set()
+        for tok in tokens:
+            if tok in query_terms:
+                tf_map[tok] = tf_map.get(tok, 0) + 1
+            tokens_set.add(tok)
+
+        doc_tfs.append(tf_map)
+        for term in query_terms:
+            if term in tokens_set:
+                df[term] += 1
+
+    # Pre-calculate IDF values for query terms
+    idf_map: dict[str, float] = {}
     for term in query_terms:
-        for tokens in doc_tokens:
-            if term in tokens:
-                df[term] = df.get(term, 0) + 1
+        # Smoothed IDF: log((N+1)/(df+1)) + 1
+        idf_map[term] = math.log((n_docs + 1) / (df[term] + 1)) + 1.0
 
     scores: List[float] = []
-    for tokens in doc_tokens:
-        tf = _term_frequency(tokens)
-        doc_len = max(len(tokens), 1)
+    for tf_map, doc_len in zip(doc_tfs, doc_lens):
         score = 0.0
-        for term in query_terms:
-            raw_tf = tf.get(term, 0)
-            if raw_tf == 0:
-                continue
-            # Normalised TF
-            normalised_tf = raw_tf / doc_len
-            # Smoothed IDF
-            idf = math.log((n_docs + 1) / (df.get(term, 0) + 1)) + 1.0
-            score += normalised_tf * idf
+        for term, raw_tf in tf_map.items():
+            # Normalised TF * Pre-calculated IDF
+            score += (raw_tf / doc_len) * idf_map[term]
         scores.append(score)
 
     return scores
