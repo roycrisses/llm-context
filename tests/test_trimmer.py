@@ -54,9 +54,8 @@ class TestCountTokens:
         assert isinstance(result, int)
         assert result > 0
 
-    def test_empty_string_returns_at_least_one(self):
-        # Our implementation uses max(1, ...)
-        assert count_tokens("") >= 1
+    def test_empty_string_returns_zero(self):
+        assert count_tokens("") == 0
 
     def test_longer_text_has_more_tokens(self):
         short = count_tokens("hi")
