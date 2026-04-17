@@ -5,13 +5,11 @@ tests/test_scanner.py — Unit tests for llm_context.scanner
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
 
 import pytest
 
 from llm_context.scanner import (
-    FileInfo,
     _load_gitignore_patterns,
     _matches_gitignore,
     _should_skip_dir,
@@ -215,3 +213,29 @@ class TestScanDirectory:
     def test_empty_directory(self, tmp_path: Path):
         files = scan_directory(tmp_path)
         assert files == []
+
+    def test_skips_symbolic_links(self, tmp_path: Path):
+        # Create a real file outside the scan root
+        external_dir = tmp_path / "external"
+        external_dir.mkdir()
+        secret_file = external_dir / "secret.txt"
+        secret_file.write_text("SENSITIVE", encoding="utf-8")
+
+        # Create the scan root
+        scan_root = tmp_path / "scan_root"
+        scan_root.mkdir()
+        (scan_root / "normal.txt").write_text("normal content", encoding="utf-8")
+
+        # Create a symlink to the secret file
+        os.symlink(secret_file, scan_root / "link_to_secret.txt")
+
+        # Create a symlink to the external directory
+        os.symlink(external_dir, scan_root / "link_to_dir")
+
+        files = scan_directory(scan_root)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert "link_to_secret.txt" not in rel_paths
+        assert not any("link_to_dir" in p for p in rel_paths)
+        assert len(files) == 1
