@@ -201,8 +201,11 @@ def trim_to_budget(
         that fit within the budget.  Contents of trimmed files are updated
         in-place on copies of the originals.
     """
-    budget = (max_tokens if max_tokens is not None else get_token_limit(model))
-    budget = max(0, budget - header_tokens)
+    limit = (max_tokens if max_tokens is not None else get_token_limit(model))
+    # If the limit is very small, don't subtract the full overhead
+    # to avoid immediate exhaustion.
+    effective_overhead = min(header_tokens, max(0, limit - 100))
+    budget = max(0, limit - effective_overhead)
 
     result: List[FileInfo] = []
     remaining = budget
