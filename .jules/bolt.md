@@ -1,0 +1,3 @@
+## 2024-05-15 - TF-IDF and Tokenization Optimization
+**Learning:** `_tokenize` was lowercasing the entire text before applying camelCase splitting regex, which made it impossible to detect case transitions. Also, `_compute_tfidf_scores` was performing $O(N \cdot M \cdot K)$ work for document frequency by re-scanning lists, which could be reduced to $O(N \cdot K)$ using sets. Pre-calculating IDF values and filtering TF counting to only query terms further boosts performance.
+**Action:** Always process tokens in their original case if case-sensitive patterns (like camelCase) are relevant. Use sets for $O(1)$ membership checks in hot loops. Pre-calculate values that are constant within a loop (like IDF for a fixed document set and query).
