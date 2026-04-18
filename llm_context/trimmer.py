@@ -169,7 +169,7 @@ def trim_to_budget(
     files: List[FileInfo],
     model: str = _DEFAULT_MODEL,
     max_tokens: Optional[int] = None,
-    header_tokens: int = _OVERHEAD_TOKENS,
+    header_tokens: Optional[int] = None,
 ) -> List[FileInfo]:
     """
     Select as many ranked files as possible within the token budget, and
@@ -201,8 +201,16 @@ def trim_to_budget(
         that fit within the budget.  Contents of trimmed files are updated
         in-place on copies of the originals.
     """
-    budget = (max_tokens if max_tokens is not None else get_token_limit(model))
-    budget = max(0, budget - header_tokens)
+    limit = (max_tokens if max_tokens is not None else get_token_limit(model))
+
+    # Dynamic overhead calculation so small budgets aren't immediately exhausted
+    if header_tokens is None:
+        if limit <= 500:
+            header_tokens = 0
+        else:
+            header_tokens = _OVERHEAD_TOKENS
+
+    budget = max(0, limit - header_tokens)
 
     result: List[FileInfo] = []
     remaining = budget

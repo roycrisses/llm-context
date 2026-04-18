@@ -5,7 +5,6 @@ tests/test_ranker.py — Unit tests for llm_context.ranker
 from __future__ import annotations
 
 import time
-from typing import List
 
 import pytest
 
@@ -53,7 +52,17 @@ class TestTokenize:
     def test_camelcase_split(self):
         tokens = _tokenize("getUserName")
         # Should contain both full and split forms
-        assert "getusername" in tokens or "username" in tokens
+        assert "get" in tokens
+        assert "user" in tokens
+        assert "name" in tokens
+        assert "getusername" in tokens
+
+    def test_snake_case_split(self):
+        tokens = _tokenize("user_name_v2")
+        assert "user" in tokens
+        assert "name" in tokens
+        assert "v2" in tokens
+        assert "user_name_v2" in tokens
 
     def test_numbers_ignored(self):
         # Purely numeric tokens are not captured by _TOKEN_RE
@@ -180,6 +189,7 @@ class TestRankFiles:
 
     def test_ranking_is_deterministic(self):
         files = [make_file(f"file{i}.py", f"def func_{i}(): pass") for i in range(10)]
-        r1 = rank_files(files, "function")
-        r2 = rank_files(files, "function")
+        now = time.time()
+        r1 = rank_files(files, "function", now=now)
+        r2 = rank_files(files, "function", now=now)
         assert [f["rel_path"] for f in r1] == [f["rel_path"] for f in r2]

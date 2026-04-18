@@ -5,9 +5,7 @@ tests/test_trimmer.py — Unit tests for llm_context.trimmer
 from __future__ import annotations
 
 import time
-from typing import List
 
-import pytest
 
 from llm_context.scanner import FileInfo
 from llm_context.trimmer import (

@@ -1,0 +1,3 @@
+## 2025-05-15 - TF-IDF and Tokenization Optimization
+**Learning:** TF-IDF calculation was a major bottleneck due to O(N) membership checks in large token lists and redundant IDF calculations. Tokenization was also slow due to unconditional `re.sub` calls and had a bug where `lower()` was called before camelCase splitting.
+**Action:** Pre-calculate IDF for query terms, use `set` for document tokens to speed up membership checks, and implement query-term filtered frequency mapping. Add guards in `_tokenize` to skip complex regex when not needed and ensure `lower()` is called after case-sensitive splitting.
