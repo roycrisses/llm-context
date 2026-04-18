@@ -211,14 +211,18 @@ def _iter_files(
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         current_dir = Path(dirpath)
 
-        # Prune excluded directories in-place so os.walk won't descend into them
+        # Prune excluded directories and symlinks in-place
         dirnames[:] = [
             d for d in dirnames
-            if not _should_skip_dir(d)
+            if not _should_skip_dir(d) and not (current_dir / d).is_symlink()
         ]
 
         for filename in filenames:
             filepath = current_dir / filename
+
+            # Skip symbolic links to prevent path traversal
+            if filepath.is_symlink():
+                continue
             try:
                 rel_path = str(filepath.relative_to(root))
             except ValueError:
