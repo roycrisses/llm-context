@@ -1,0 +1,4 @@
+## 2024-05-22 - Path Traversal via Symbolic Links in Scanner
+**Vulnerability:** The codebase scanner was following symbolic links that point outside the project root. This allowed an attacker or a malicious configuration to leak sensitive files (e.g., `/etc/passwd`, private keys) into the LLM context if a symlink to them was present in the scanned directory.
+**Learning:** `os.walk` by default does not follow directory symlinks unless `followlinks=True` is set, but it still yields file symlinks in the `filenames` list. Directory symlinks are included in `dirnames` and can be manually traversed if not pruned.
+**Prevention:** Always explicitly check for symlinks using `pathlib.Path.is_symlink()` or `os.path.islink()` when recursively scanning directories. Prune directory symlinks from `dirnames` in-place when using `os.walk` to prevent descent, and skip file symlinks during iteration.

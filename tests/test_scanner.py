@@ -5,13 +5,11 @@ tests/test_scanner.py — Unit tests for llm_context.scanner
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
 
 import pytest
 
 from llm_context.scanner import (
-    FileInfo,
     _load_gitignore_patterns,
     _matches_gitignore,
     _should_skip_dir,
@@ -215,3 +213,40 @@ class TestScanDirectory:
     def test_empty_directory(self, tmp_path: Path):
         files = scan_directory(tmp_path)
         assert files == []
+
+    def test_skips_symlinks(self, tmp_path: Path):
+        # Create a file outside the scan root
+        outside_file = tmp_path / "outside.txt"
+        outside_file.write_text("outside content", encoding="utf-8")
+
+        # Create the scan root
+        root = tmp_path / "root"
+        root.mkdir()
+        (root / "normal.txt").write_text("normal content", encoding="utf-8")
+
+        # Create a symlink to the outside file
+        os.symlink(outside_file, root / "linked.txt")
+
+        # Create a symlink to a directory
+        outside_dir = tmp_path / "outside_dir"
+        outside_dir.mkdir()
+        (outside_dir / "secret.txt").write_text("secret", encoding="utf-8")
+        os.symlink(outside_dir, root / "linked_dir")
+
+        files = scan_directory(root)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert "linked.txt" not in rel_paths
+        assert not any("linked_dir" in p for p in rel_paths)
+        assert not any("secret.txt" in p for p in rel_paths)
+
+    def test_excludes_history_files(self, tmp_path: Path):
+        (tmp_path / ".bash_history").write_text("ls -la", encoding="utf-8")
+        (tmp_path / "normal.txt").write_text("content", encoding="utf-8")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert ".bash_history" not in rel_paths
