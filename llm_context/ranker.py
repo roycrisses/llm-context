@@ -27,13 +27,28 @@ def _tokenize(text: str) -> List[str]:
     Extract lowercase alphanumeric tokens from *text*.
     Splits on punctuation, whitespace, and underscores intelligently.
     """
-    raw = _TOKEN_RE.findall(text.lower())
+    # Find all alphanumeric/underscore sequences
+    raw = _TOKEN_RE.findall(text)
     expanded: List[str] = []
     for tok in raw:
-        # Also split camelCase / snake_case into sub-tokens
-        parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
-        expanded.extend(p.lower() for p in parts)
-        expanded.append(tok)
+        # 1. Add the token itself (lowercased)
+        lowered = tok.lower()
+        expanded.append(lowered)
+
+        # 2. Split on underscores (snake_case)
+        if "_" in tok:
+            parts = tok.split("_")
+            for p in parts:
+                if p:
+                    expanded.append(p.lower())
+
+        # 3. Split camelCase into sub-tokens
+        # We use the original token to detect case changes
+        camel_parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
+        if len(camel_parts) > 1:
+            for p in camel_parts:
+                expanded.append(p.lower())
+
     return expanded
 
 
@@ -117,12 +132,12 @@ def _filename_boost(rel_path: str, query_terms: List[str]) -> float:
     return 0.15 * hits
 
 
-def _recency_boost(mtime: float) -> float:
+def _recency_boost(mtime: float, now: float) -> float:
     """
     Return a small additive boost for files modified within the last week.
     Boost decays linearly from 0.10 → 0.0 over the recency window.
     """
-    age = time.time() - mtime
+    age = now - mtime
     if age < 0:
         return 0.10
     if age >= _RECENCY_WINDOW_SECONDS:
@@ -172,13 +187,14 @@ def rank_files(files: List[FileInfo], query: str) -> List[FileInfo]:
     query_terms = list(set(_tokenize(query)))
 
     tfidf_scores = _compute_tfidf_scores(files, query_terms)
+    now = time.time()
 
     scored: List[tuple[float, int]] = []
     for idx, (f, base_score) in enumerate(zip(files, tfidf_scores)):
         total = (
             base_score
             + _filename_boost(f["rel_path"], query_terms)
-            + _recency_boost(f["mtime"])
+            + _recency_boost(f["mtime"], now)
         )
         scored.append((total, idx))
 
