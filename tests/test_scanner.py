@@ -215,3 +215,37 @@ class TestScanDirectory:
     def test_empty_directory(self, tmp_path: Path):
         files = scan_directory(tmp_path)
         assert files == []
+
+    def test_skips_symlinks(self, tmp_path: Path):
+        """Ensure that symlinked files and directories are ignored."""
+        project = tmp_path / "project"
+        project.mkdir()
+
+        # Real file
+        real_file = project / "real.txt"
+        real_file.write_text("real content")
+
+        # External file
+        external_file = tmp_path / "external.txt"
+        external_file.write_text("sensitive")
+
+        # Symlink to external file
+        symlink_file = project / "link.txt"
+        symlink_file.symlink_to(external_file)
+
+        # External directory
+        external_dir = tmp_path / "ext_dir"
+        external_dir.mkdir()
+        (external_dir / "secret.txt").write_text("shhh")
+
+        # Symlink to external directory
+        symlink_dir = project / "link_dir"
+        symlink_dir.symlink_to(external_dir)
+
+        files = scan_directory(project)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "real.txt" in rel_paths
+        assert "link.txt" not in rel_paths
+        assert "link_dir/secret.txt" not in rel_paths
+        assert len(files) == 1
