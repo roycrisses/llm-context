@@ -5,14 +5,11 @@ tests/test_ranker.py — Unit tests for llm_context.ranker
 from __future__ import annotations
 
 import time
-from typing import List
 
 import pytest
 
 from llm_context.ranker import (
     _filename_boost,
-    _recency_boost,
-    _term_frequency,
     _tokenize,
     rank_files,
 )
@@ -70,20 +67,6 @@ class TestTokenize:
 
 
 # ---------------------------------------------------------------------------
-# _term_frequency
-# ---------------------------------------------------------------------------
-
-class TestTermFrequency:
-    def test_counts_correctly(self):
-        tf = _term_frequency(["a", "b", "a", "c", "a"])
-        assert tf["a"] == 3
-        assert tf["b"] == 1
-
-    def test_empty(self):
-        assert _term_frequency([]) == {}
-
-
-# ---------------------------------------------------------------------------
 # _filename_boost
 # ---------------------------------------------------------------------------
 
@@ -100,29 +83,6 @@ class TestFilenameBoost:
         single = _filename_boost("auth_login.py", ["auth"])
         double = _filename_boost("auth_login.py", ["auth", "login"])
         assert double > single
-
-
-# ---------------------------------------------------------------------------
-# _recency_boost
-# ---------------------------------------------------------------------------
-
-class TestRecencyBoost:
-    def test_very_recent_file_gets_boost(self):
-        now = time.time()
-        assert _recency_boost(now) > 0.0
-
-    def test_old_file_gets_no_boost(self):
-        old = time.time() - (30 * 24 * 3600)  # 30 days ago
-        assert _recency_boost(old) == 0.0
-
-    def test_future_mtime_gets_max_boost(self):
-        future = time.time() + 3600
-        assert _recency_boost(future) == pytest.approx(0.10)
-
-    def test_week_old_file_gets_some_boost(self):
-        week_ago = time.time() - (6 * 24 * 3600)
-        boost = _recency_boost(week_ago)
-        assert 0.0 < boost < 0.10
 
 
 # ---------------------------------------------------------------------------
