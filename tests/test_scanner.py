@@ -5,13 +5,11 @@ tests/test_scanner.py — Unit tests for llm_context.scanner
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
 
 import pytest
 
 from llm_context.scanner import (
-    FileInfo,
     _load_gitignore_patterns,
     _matches_gitignore,
     _should_skip_dir,
@@ -215,3 +213,30 @@ class TestScanDirectory:
     def test_empty_directory(self, tmp_path: Path):
         files = scan_directory(tmp_path)
         assert files == []
+
+    def test_skips_symlinks(self, tmp_path: Path):
+        """Verify that symlinks (pointing inside or outside) are skipped."""
+        target = tmp_path / "target.txt"
+        target.write_text("target content")
+
+        link = tmp_path / "link.txt"
+        os.symlink(target, link)
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "target.txt" in rel_paths
+        # Symlinks should be explicitly excluded for security
+        assert "link.txt" not in rel_paths
+
+    def test_excludes_history_files(self, tmp_path: Path):
+        """Verify that shell history files are excluded."""
+        (tmp_path / ".bash_history").write_text("secret history")
+        (tmp_path / "regular.txt").write_text("regular content")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "regular.txt" in rel_paths
+        # History files should be excluded by default
+        assert ".bash_history" not in rel_paths
