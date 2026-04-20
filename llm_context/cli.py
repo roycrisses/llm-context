@@ -26,6 +26,7 @@ from llm_context.trimmer import MODEL_TOKEN_LIMITS, get_token_limit, trim_to_bud
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _echo_error(msg: str) -> None:
     click.echo(click.style(f"Error: {msg}", fg="red"), err=True)
 
@@ -42,34 +43,37 @@ def _echo_success(msg: str) -> None:
 # CLI entrypoint
 # ---------------------------------------------------------------------------
 
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument(
     "directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
 @click.option(
-    "--ask", "-q",
+    "--ask",
+    "-q",
     required=True,
     help="Your question about the codebase.",
     metavar="QUESTION",
 )
 @click.option(
-    "--model", "-m",
+    "--model",
+    "-m",
     default="gpt-4o",
     show_default=True,
-    type=click.Choice(
-        list(MODEL_TOKEN_LIMITS.keys()), case_sensitive=False
-    ),
+    type=click.Choice(list(MODEL_TOKEN_LIMITS.keys()), case_sensitive=False),
     help="Target LLM model (controls token budget).",
 )
 @click.option(
-    "--send", "do_send",
+    "--send",
+    "do_send",
     is_flag=True,
     default=False,
     help="Send the context directly to the LLM and print the response.",
 )
 @click.option(
-    "--copy", "do_copy",
+    "--copy",
+    "do_copy",
     is_flag=True,
     default=False,
     help="Copy the context block to the clipboard.",
@@ -96,14 +100,16 @@ def _echo_success(msg: str) -> None:
     metavar="GLOB",
 )
 @click.option(
-    "--output", "-o",
+    "--output",
+    "-o",
     default=None,
     type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Save context to a file instead of printing to stdout.",
     metavar="FILE",
 )
 @click.option(
-    "--verbose", "-v",
+    "--verbose",
+    "-v",
     is_flag=True,
     default=False,
     help="Print scan/rank progress information to stderr.",
@@ -185,9 +191,7 @@ def main(
 
     # ── 4. Assemble ─────────────────────────────────────────────────────────
     try:
-        context_block = build_context_block(
-            trimmed, query=ask, model=model, max_tokens=max_tokens
-        )
+        context_block = build_context_block(trimmed, query=ask, model=model, max_tokens=max_tokens)
     except ValueError as exc:
         _echo_error(str(exc))
         sys.exit(1)
@@ -207,12 +211,11 @@ def main(
     if do_copy:
         try:
             import pyperclip  # type: ignore
+
             pyperclip.copy(context_block)
             _echo_success("Context copied to clipboard.")
         except ImportError:
-            _echo_error(
-                "pyperclip is not installed. Install with: pip install pyperclip"
-            )
+            _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
             _echo_error(f"Clipboard copy failed: {exc}")
 

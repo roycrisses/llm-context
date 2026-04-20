@@ -24,11 +24,11 @@ from llm_context.scanner import FileInfo
 # ---------------------------------------------------------------------------
 
 MODEL_TOKEN_LIMITS: dict[str, int] = {
-    "gpt-4o":  120_000,
-    "gpt-4":     8_000,
-    "claude":  180_000,
-    "gemini":  900_000,
-    "ollama":    4_000,
+    "gpt-4o": 120_000,
+    "gpt-4": 8_000,
+    "claude": 180_000,
+    "gemini": 900_000,
+    "ollama": 4_000,
 }
 
 _DEFAULT_MODEL = "gpt-4o"
@@ -39,6 +39,7 @@ _OVERHEAD_TOKENS = 512
 # ---------------------------------------------------------------------------
 # Token counting
 # ---------------------------------------------------------------------------
+
 
 def _get_tiktoken_encoder(model: str):
     """
@@ -51,7 +52,7 @@ def _get_tiktoken_encoder(model: str):
         # Map our model names → tiktoken encoding names
         encoding_map = {
             "gpt-4o": "cl100k_base",
-            "gpt-4":  "cl100k_base",
+            "gpt-4": "cl100k_base",
         }
         encoding_name = encoding_map.get(model, "cl100k_base")
         return tiktoken.get_encoding(encoding_name)
@@ -111,6 +112,7 @@ def get_token_limit(model: str) -> int:
 # Smart per-file truncation
 # ---------------------------------------------------------------------------
 
+
 def _truncate_file_content(
     content: str,
     max_tokens: int,
@@ -155,15 +157,14 @@ def _truncate_file_content(
     if len(kept) < min(head_lines, len(lines)):
         kept = lines[:head_lines]
 
-    truncation_note = (
-        f"\n# ... [{len(lines) - len(kept)} lines truncated to fit token budget] ..."
-    )
+    truncation_note = f"\n# ... [{len(lines) - len(kept)} lines truncated to fit token budget] ..."
     return "\n".join(kept) + truncation_note
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def trim_to_budget(
     files: List[FileInfo],
@@ -201,7 +202,7 @@ def trim_to_budget(
         that fit within the budget.  Contents of trimmed files are updated
         in-place on copies of the originals.
     """
-    budget = (max_tokens if max_tokens is not None else get_token_limit(model))
+    budget = max_tokens if max_tokens is not None else get_token_limit(model)
     budget = max(0, budget - header_tokens)
 
     result: List[FileInfo] = []
@@ -222,7 +223,9 @@ def trim_to_budget(
             # Try to fit a truncated version
             if remaining > 50:  # Only worth including if meaningful space remains
                 trimmed_content = _truncate_file_content(
-                    f["content"], remaining - 20, model  # -20 for fence overhead
+                    f["content"],
+                    remaining - 20,
+                    model,  # -20 for fence overhead
                 )
                 # Make a shallow copy with updated content
                 trimmed_file: FileInfo = {**f, "content": trimmed_content}

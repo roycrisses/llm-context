@@ -1,0 +1,4 @@
+## 2025-01-24 - Path Traversal via Symbolic Links
+**Vulnerability:** The file scanner followed symbolic links that pointed outside the project root, allowing sensitive files (like `/etc/hostname` or private keys) to be included in the generated LLM context if a symlink was present in the scanned directory.
+**Learning:** `os.walk` does not follow directory symlinks by default, but it does include file symlinks in `filenames`, and `Path.read_text()` or `open()` will follow them. Many developers assume `os.walk` is "safe" without explicitly checking `is_symlink()`.
+**Prevention:** Always explicitly check for symbolic links using `is_symlink()` and skip them when recursively scanning directories for content, unless following symlinks is an explicit, intentional requirement with built-in path validation.

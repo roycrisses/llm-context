@@ -19,6 +19,7 @@ from typing import Optional
 # Provider helpers
 # ---------------------------------------------------------------------------
 
+
 def _require_env(var: str) -> str:
     """
     Return the value of environment variable *var*.
@@ -31,8 +32,7 @@ def _require_env(var: str) -> str:
     value = os.environ.get(var, "").strip()
     if not value:
         raise EnvironmentError(
-            f"Environment variable '{var}' is not set. "
-            f"Export it before running llm-context."
+            f"Environment variable '{var}' is not set. Export it before running llm-context."
         )
     return value
 
@@ -40,6 +40,7 @@ def _require_env(var: str) -> str:
 # ---------------------------------------------------------------------------
 # OpenAI
 # ---------------------------------------------------------------------------
+
 
 def _send_openai(context: str, model: str) -> str:
     """
@@ -85,6 +86,7 @@ def _send_openai(context: str, model: str) -> str:
 # ---------------------------------------------------------------------------
 # Anthropic / Claude
 # ---------------------------------------------------------------------------
+
 
 def _send_claude(context: str, model: str) -> str:
     """
@@ -133,14 +135,13 @@ def _send_claude(context: str, model: str) -> str:
         messages=[{"role": "user", "content": context}],
     )
     # content is a list of ContentBlock objects
-    return "".join(
-        block.text for block in message.content if hasattr(block, "text")
-    )
+    return "".join(block.text for block in message.content if hasattr(block, "text"))
 
 
 # ---------------------------------------------------------------------------
 # Google Gemini
 # ---------------------------------------------------------------------------
+
 
 def _send_gemini(context: str, model: str) -> str:
     """
@@ -190,6 +191,7 @@ def _send_gemini(context: str, model: str) -> str:
 # ---------------------------------------------------------------------------
 # Ollama (local)
 # ---------------------------------------------------------------------------
+
 
 def _send_ollama(context: str, model: str, base_url: str = "http://localhost:11434") -> str:
     """
@@ -255,11 +257,11 @@ def _send_ollama(context: str, model: str, base_url: str = "http://localhost:114
 # ---------------------------------------------------------------------------
 
 _PROVIDER_MAP: dict[str, str] = {
-    "gpt-4o":  "openai",
-    "gpt-4":   "openai",
-    "claude":  "claude",
-    "gemini":  "gemini",
-    "ollama":  "ollama",
+    "gpt-4o": "openai",
+    "gpt-4": "openai",
+    "claude": "claude",
+    "gemini": "gemini",
+    "ollama": "ollama",
 }
 
 
@@ -306,8 +308,7 @@ def send(
             provider = "gemini"
         else:
             raise ValueError(
-                f"Unknown model '{model}'. Supported aliases: "
-                + ", ".join(_PROVIDER_MAP)
+                f"Unknown model '{model}'. Supported aliases: " + ", ".join(_PROVIDER_MAP)
             )
 
     if provider == "openai":
