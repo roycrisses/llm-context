@@ -4,14 +4,11 @@ tests/test_scanner.py — Unit tests for llm_context.scanner
 
 from __future__ import annotations
 
-import os
-import time
 from pathlib import Path
 
 import pytest
 
 from llm_context.scanner import (
-    FileInfo,
     _load_gitignore_patterns,
     _matches_gitignore,
     _should_skip_dir,
@@ -23,6 +20,7 @@ from llm_context.scanner import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def tmp_project(tmp_path: Path) -> Path:
@@ -44,6 +42,7 @@ def tmp_project(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 # _should_skip_dir
 # ---------------------------------------------------------------------------
+
 
 class TestShouldSkipDir:
     def test_excludes_node_modules(self):
@@ -67,6 +66,7 @@ class TestShouldSkipDir:
 # _should_skip_file
 # ---------------------------------------------------------------------------
 
+
 class TestShouldSkipFile:
     def test_excludes_env_file(self):
         assert _should_skip_file(".env", "", ".env", [], None) is True
@@ -75,27 +75,22 @@ class TestShouldSkipFile:
         assert _should_skip_file("logo.png", "png", "logo.png", [], None) is True
 
     def test_excludes_lock_file(self):
-        assert _should_skip_file(
-            "package-lock.json", "", "package-lock.json", [], None
-        ) is True
+        assert _should_skip_file("package-lock.json", "", "package-lock.json", [], None) is True
 
     def test_allows_python_file(self):
         assert _should_skip_file("main.py", "py", "src/main.py", [], None) is False
 
     def test_excludes_by_extra_pattern(self):
-        assert _should_skip_file(
-            "secrets.txt", "txt", "secrets.txt", [], ["secrets.*"]
-        ) is True
+        assert _should_skip_file("secrets.txt", "txt", "secrets.txt", [], ["secrets.*"]) is True
 
     def test_gitignore_pattern_match(self):
-        assert _should_skip_file(
-            "debug.log", "log", "logs/debug.log", ["*.log"], None
-        ) is True
+        assert _should_skip_file("debug.log", "log", "logs/debug.log", ["*.log"], None) is True
 
 
 # ---------------------------------------------------------------------------
 # _load_gitignore_patterns / _matches_gitignore
 # ---------------------------------------------------------------------------
+
 
 class TestGitignore:
     def test_load_empty_when_missing(self, tmp_path: Path):
@@ -126,6 +121,7 @@ class TestGitignore:
 # ---------------------------------------------------------------------------
 # scan_directory
 # ---------------------------------------------------------------------------
+
 
 class TestScanDirectory:
     def test_raises_on_missing_dir(self, tmp_path: Path):
@@ -215,3 +211,31 @@ class TestScanDirectory:
     def test_empty_directory(self, tmp_path: Path):
         files = scan_directory(tmp_path)
         assert files == []
+
+    def test_skips_symlinks(self, tmp_path: Path):
+        project = tmp_path / "project"
+        project.mkdir()
+        (project / "regular.txt").write_text("regular content")
+
+        # Create a file outside the project
+        secret = tmp_path / "secret.txt"
+        secret.write_text("secret content")
+
+        # Symlink to the secret file
+        (project / "secret_link.txt").symlink_to(secret)
+
+        # Symlink to a directory
+        secret_dir = tmp_path / "secret_dir"
+        secret_dir.mkdir()
+        (secret_dir / "hidden.txt").write_text("hidden")
+        # In current scanner, os.walk does NOT follow dir symlinks by default
+        # But let's verify if we want to explicitly skip them if they WERE followed.
+        (project / "dir_link").symlink_to(secret_dir)
+
+        files = scan_directory(project)
+        rel_paths = [f["rel_path"] for f in files]
+
+        # VERIFICATION: secret_link.txt and dir_link should NOT be there
+        assert "regular.txt" in rel_paths
+        assert "secret_link.txt" not in rel_paths
+        assert not any("dir_link" in p for p in rel_paths)
