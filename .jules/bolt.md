@@ -1,0 +1,3 @@
+## 2026-04-15 - [Optimization of Ranker TF-IDF and Tokenization]
+**Learning:** Document Frequency (DF) calculation was previously O(Q * N * L) because it used linear 'term in list' checks for every query term against every document's token list. By converting document tokens to sets once, membership tests became O(1), reducing complexity to O(N * L + Q * N). Additionally, moving IDF calculation outside the document loop avoids O(Q * N) redundant math operations.
+**Action:** Always prefer set-based membership tests for frequency counting across large datasets. Pre-calculate values (like IDF) that are constant for a given query before entering document loops.
