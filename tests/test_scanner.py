@@ -4,14 +4,11 @@ tests/test_scanner.py — Unit tests for llm_context.scanner
 
 from __future__ import annotations
 
-import os
-import time
 from pathlib import Path
 
 import pytest
 
 from llm_context.scanner import (
-    FileInfo,
     _load_gitignore_patterns,
     _matches_gitignore,
     _should_skip_dir,
