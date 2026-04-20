@@ -19,7 +19,7 @@ import click
 from llm_context.context import build_context_block
 from llm_context.ranker import rank_files
 from llm_context.scanner import scan_directory
-from llm_context.trimmer import MODEL_TOKEN_LIMITS, get_token_limit, trim_to_budget
+from llm_context.trimmer import MODEL_TOKEN_LIMITS, count_tokens, get_token_limit, trim_to_budget
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +196,10 @@ def main(
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'.")
+            _echo_success(
+                f"Context saved to '{output}' "
+                f"({len(trimmed)} files, {count_tokens(context_block, model=model):,} tokens)."
+            )
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
@@ -208,7 +211,10 @@ def main(
         try:
             import pyperclip  # type: ignore
             pyperclip.copy(context_block)
-            _echo_success("Context copied to clipboard.")
+            _echo_success(
+                f"✨ Context copied to clipboard "
+                f"({len(trimmed)} files, {count_tokens(context_block, model=model):,} tokens)."
+            )
         except ImportError:
             _echo_error(
                 "pyperclip is not installed. Install with: pip install pyperclip"
