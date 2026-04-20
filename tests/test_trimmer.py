@@ -5,9 +5,7 @@ tests/test_trimmer.py — Unit tests for llm_context.trimmer
 from __future__ import annotations
 
 import time
-from typing import List
 
-import pytest
 
 from llm_context.scanner import FileInfo
 from llm_context.trimmer import (
@@ -22,6 +20,7 @@ from llm_context.trimmer import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_file(
     rel_path: str = "file.py",
@@ -48,6 +47,7 @@ def big_content(n_lines: int = 500) -> str:
 # count_tokens
 # ---------------------------------------------------------------------------
 
+
 class TestCountTokens:
     def test_returns_positive_int(self):
         result = count_tokens("hello world")
@@ -73,6 +73,7 @@ class TestCountTokens:
 # get_token_limit
 # ---------------------------------------------------------------------------
 
+
 class TestGetTokenLimit:
     def test_known_models(self):
         assert get_token_limit("gpt-4o") == 120_000
@@ -91,6 +92,7 @@ class TestGetTokenLimit:
 # ---------------------------------------------------------------------------
 # _truncate_file_content
 # ---------------------------------------------------------------------------
+
 
 class TestTruncateFileContent:
     def test_no_truncation_when_fits(self):
@@ -118,6 +120,7 @@ class TestTruncateFileContent:
 # ---------------------------------------------------------------------------
 # trim_to_budget
 # ---------------------------------------------------------------------------
+
 
 class TestTrimToBudget:
     def test_returns_empty_for_empty_input(self):
