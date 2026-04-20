@@ -14,12 +14,12 @@ from typing import Iterator, List, Optional, TypedDict
 class FileInfo(TypedDict):
     """Represents a single file discovered by the scanner."""
 
-    path: str          # Absolute path to the file
-    rel_path: str      # Path relative to the scanned root
-    content: str       # UTF-8 text content (empty string if unreadable)
-    size: int          # File size in bytes
-    extension: str     # File extension without the dot (e.g. "py")
-    mtime: float       # Last-modified timestamp (Unix epoch)
+    path: str  # Absolute path to the file
+    rel_path: str  # Path relative to the scanned root
+    content: str  # UTF-8 text content (empty string if unreadable)
+    size: int  # File size in bytes
+    extension: str  # File extension without the dot (e.g. "py")
+    mtime: float  # Last-modified timestamp (Unix epoch)
 
 
 # ---------------------------------------------------------------------------
@@ -53,20 +53,59 @@ _EXCLUDED_DIRS: frozenset[str] = frozenset(
 _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
     {
         # Binary / media
-        "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "webp", "avif",
-        "mp4", "mov", "avi", "mkv", "webm",
-        "mp3", "wav", "ogg", "flac",
-        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-        "zip", "tar", "gz", "bz2", "xz", "7z", "rar",
-        "exe", "dll", "so", "dylib", "wasm",
-        "ttf", "otf", "woff", "woff2", "eot",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "ico",
+        "svg",
+        "webp",
+        "avif",
+        "mp4",
+        "mov",
+        "avi",
+        "mkv",
+        "webm",
+        "mp3",
+        "wav",
+        "ogg",
+        "flac",
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "ppt",
+        "pptx",
+        "zip",
+        "tar",
+        "gz",
+        "bz2",
+        "xz",
+        "7z",
+        "rar",
+        "exe",
+        "dll",
+        "so",
+        "dylib",
+        "wasm",
+        "ttf",
+        "otf",
+        "woff",
+        "woff2",
+        "eot",
         # Lock / generated
         "lock",
         "map",
         # DB / binary data
-        "db", "sqlite", "sqlite3",
+        "db",
+        "sqlite",
+        "sqlite3",
         # Compiled
-        "pyc", "pyo", "class",
+        "pyc",
+        "pyo",
+        "class",
     }
 )
 
@@ -86,6 +125,11 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         "Cargo.lock",
         "composer.lock",
         "Gemfile.lock",
+        ".bash_history",
+        ".zsh_history",
+        ".history",
+        ".python_history",
+        ".node_repl_history",
     }
 )
 
@@ -93,6 +137,7 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
 # ---------------------------------------------------------------------------
 # .gitignore parser
 # ---------------------------------------------------------------------------
+
 
 def _load_gitignore_patterns(root: Path) -> List[str]:
     """
@@ -155,6 +200,7 @@ def _matches_gitignore(rel_path: str, patterns: List[str]) -> bool:
 # Core scanner
 # ---------------------------------------------------------------------------
 
+
 def _should_skip_dir(dirname: str) -> bool:
     """Return True if a directory name should be skipped entirely."""
     return dirname in _EXCLUDED_DIRS or dirname.startswith(".")
@@ -211,14 +257,16 @@ def _iter_files(
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         current_dir = Path(dirpath)
 
-        # Prune excluded directories in-place so os.walk won't descend into them
+        # Prune excluded directories and symbolic links in-place so os.walk won't descend into them
         dirnames[:] = [
-            d for d in dirnames
-            if not _should_skip_dir(d)
+            d for d in dirnames if not _should_skip_dir(d) and not (current_dir / d).is_symlink()
         ]
 
         for filename in filenames:
             filepath = current_dir / filename
+            if filepath.is_symlink():
+                continue
+
             try:
                 rel_path = str(filepath.relative_to(root))
             except ValueError:
@@ -297,9 +345,7 @@ def scan_directory(
 
     gitignore_patterns = _load_gitignore_patterns(root)
 
-    files = list(
-        _iter_files(root, gitignore_patterns, extra_includes, extra_excludes)
-    )
+    files = list(_iter_files(root, gitignore_patterns, extra_includes, extra_excludes))
 
     # Stable sort by relative path
     files.sort(key=lambda f: f["rel_path"])

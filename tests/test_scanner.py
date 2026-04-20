@@ -4,14 +4,11 @@ tests/test_scanner.py — Unit tests for llm_context.scanner
 
 from __future__ import annotations
 
-import os
-import time
 from pathlib import Path
 
 import pytest
 
 from llm_context.scanner import (
-    FileInfo,
     _load_gitignore_patterns,
     _matches_gitignore,
     _should_skip_dir,
@@ -23,6 +20,7 @@ from llm_context.scanner import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def tmp_project(tmp_path: Path) -> Path:
@@ -44,6 +42,7 @@ def tmp_project(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 # _should_skip_dir
 # ---------------------------------------------------------------------------
+
 
 class TestShouldSkipDir:
     def test_excludes_node_modules(self):
@@ -67,6 +66,7 @@ class TestShouldSkipDir:
 # _should_skip_file
 # ---------------------------------------------------------------------------
 
+
 class TestShouldSkipFile:
     def test_excludes_env_file(self):
         assert _should_skip_file(".env", "", ".env", [], None) is True
@@ -75,27 +75,22 @@ class TestShouldSkipFile:
         assert _should_skip_file("logo.png", "png", "logo.png", [], None) is True
 
     def test_excludes_lock_file(self):
-        assert _should_skip_file(
-            "package-lock.json", "", "package-lock.json", [], None
-        ) is True
+        assert _should_skip_file("package-lock.json", "", "package-lock.json", [], None) is True
 
     def test_allows_python_file(self):
         assert _should_skip_file("main.py", "py", "src/main.py", [], None) is False
 
     def test_excludes_by_extra_pattern(self):
-        assert _should_skip_file(
-            "secrets.txt", "txt", "secrets.txt", [], ["secrets.*"]
-        ) is True
+        assert _should_skip_file("secrets.txt", "txt", "secrets.txt", [], ["secrets.*"]) is True
 
     def test_gitignore_pattern_match(self):
-        assert _should_skip_file(
-            "debug.log", "log", "logs/debug.log", ["*.log"], None
-        ) is True
+        assert _should_skip_file("debug.log", "log", "logs/debug.log", ["*.log"], None) is True
 
 
 # ---------------------------------------------------------------------------
 # _load_gitignore_patterns / _matches_gitignore
 # ---------------------------------------------------------------------------
+
 
 class TestGitignore:
     def test_load_empty_when_missing(self, tmp_path: Path):
@@ -126,6 +121,7 @@ class TestGitignore:
 # ---------------------------------------------------------------------------
 # scan_directory
 # ---------------------------------------------------------------------------
+
 
 class TestScanDirectory:
     def test_raises_on_missing_dir(self, tmp_path: Path):
@@ -215,3 +211,36 @@ class TestScanDirectory:
     def test_empty_directory(self, tmp_path: Path):
         files = scan_directory(tmp_path)
         assert files == []
+
+    def test_skips_symlinks(self, tmp_path: Path):
+        (tmp_path / "real_file.txt").write_text("content")
+        (tmp_path / "link.txt").symlink_to(tmp_path / "real_file.txt")
+
+        # External file link
+        external_file = tmp_path.parent / "external.txt"
+        external_file.write_text("external content")
+        (tmp_path / "ext_link.txt").symlink_to(external_file)
+
+        # Directory link
+        (tmp_path / "subdir").mkdir()
+        (tmp_path / "subdir_link").symlink_to(tmp_path / "subdir")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "real_file.txt" in rel_paths
+        assert "link.txt" not in rel_paths
+        assert "ext_link.txt" not in rel_paths
+        assert "subdir_link" not in rel_paths
+
+    def test_excludes_history_files(self, tmp_path: Path):
+        (tmp_path / ".bash_history").write_text("history")
+        (tmp_path / ".zsh_history").write_text("history")
+        (tmp_path / "normal.txt").write_text("normal")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert ".bash_history" not in rel_paths
+        assert ".zsh_history" not in rel_paths

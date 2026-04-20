@@ -5,7 +5,6 @@ tests/test_ranker.py — Unit tests for llm_context.ranker
 from __future__ import annotations
 
 import time
-from typing import List
 
 import pytest
 
@@ -22,6 +21,7 @@ from llm_context.scanner import FileInfo
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_file(
     rel_path: str,
@@ -43,6 +43,7 @@ def make_file(
 # ---------------------------------------------------------------------------
 # _tokenize
 # ---------------------------------------------------------------------------
+
 
 class TestTokenize:
     def test_basic_words(self):
@@ -73,6 +74,7 @@ class TestTokenize:
 # _term_frequency
 # ---------------------------------------------------------------------------
 
+
 class TestTermFrequency:
     def test_counts_correctly(self):
         tf = _term_frequency(["a", "b", "a", "c", "a"])
@@ -86,6 +88,7 @@ class TestTermFrequency:
 # ---------------------------------------------------------------------------
 # _filename_boost
 # ---------------------------------------------------------------------------
+
 
 class TestFilenameBoost:
     def test_boost_when_match(self):
@@ -105,6 +108,7 @@ class TestFilenameBoost:
 # ---------------------------------------------------------------------------
 # _recency_boost
 # ---------------------------------------------------------------------------
+
 
 class TestRecencyBoost:
     def test_very_recent_file_gets_boost(self):
@@ -128,6 +132,7 @@ class TestRecencyBoost:
 # ---------------------------------------------------------------------------
 # rank_files
 # ---------------------------------------------------------------------------
+
 
 class TestRankFiles:
     def test_raises_on_empty_query(self):

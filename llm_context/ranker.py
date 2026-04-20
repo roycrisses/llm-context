@@ -49,6 +49,7 @@ def _term_frequency(tokens: List[str]) -> dict[str, float]:
 # TF-IDF scorer
 # ---------------------------------------------------------------------------
 
+
 def _compute_tfidf_scores(
     files: List[FileInfo],
     query_terms: List[str],
@@ -134,6 +135,7 @@ def _recency_boost(mtime: float) -> float:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def rank_files(files: List[FileInfo], query: str) -> List[FileInfo]:
     """
     Score and sort *files* by their relevance to *query*.
@@ -176,9 +178,7 @@ def rank_files(files: List[FileInfo], query: str) -> List[FileInfo]:
     scored: List[tuple[float, int]] = []
     for idx, (f, base_score) in enumerate(zip(files, tfidf_scores)):
         total = (
-            base_score
-            + _filename_boost(f["rel_path"], query_terms)
-            + _recency_boost(f["mtime"])
+            base_score + _filename_boost(f["rel_path"], query_terms) + _recency_boost(f["mtime"])
         )
         scored.append((total, idx))
 

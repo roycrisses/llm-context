@@ -85,9 +85,7 @@ def build_context_block(
     parts.append(_DIVIDER)
     parts.append("CODEBASE CONTEXT")
     parts.append(f"Question: {query}")
-    parts.append(
-        f"Model: {model} | Token budget: {token_budget:,} | Files included: {len(files)}"
-    )
+    parts.append(f"Model: {model} | Token budget: {token_budget:,} | Files included: {len(files)}")
     parts.append(_DIVIDER)
 
     # ── File blocks ─────────────────────────────────────────────────────────
