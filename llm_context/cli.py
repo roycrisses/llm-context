@@ -3,9 +3,9 @@ cli.py — Click-based command-line interface for llm-context.
 
 Usage
 -----
-    llm-context ./my-project --ask "why is auth broken?"
-    llm-context ./my-project --ask "explain models" --model claude --send
-    llm-context ./my-project --ask "refactor async" --copy
+    llm-context --ask "why is auth broken?"
+    llm-context src --ask "explain models" --model claude --send
+    llm-context --ask "refactor async" --copy
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import click
 from llm_context.context import build_context_block
 from llm_context.ranker import rank_files
 from llm_context.scanner import scan_directory
-from llm_context.trimmer import MODEL_TOKEN_LIMITS, get_token_limit, trim_to_budget
+from llm_context.trimmer import MODEL_TOKEN_LIMITS, count_tokens, get_token_limit, trim_to_budget
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +47,8 @@ def _echo_success(msg: str) -> None:
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument(
     "directory",
+    default=".",
+    required=False,
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
 @click.option(
@@ -133,9 +135,9 @@ def main(
     \b
     Examples
     --------
-      llm-context ./my-project --ask "why is auth broken?"
+      llm-context --ask "why is auth broken?"
       llm-context ./src --ask "explain the data models" --model gpt-4 --send
-      llm-context . --ask "refactor to async" --model claude --copy
+      llm-context --ask "refactor to async" --model claude --copy
     """
     model = model.lower()
     extra_includes = list(include) if include else None
@@ -200,7 +202,8 @@ def main(
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'.")
+            total_tokens = count_tokens(context_block, model)
+            _echo_success(f"Context saved to '{output}' ({total_tokens:,} tokens).")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
@@ -213,7 +216,8 @@ def main(
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success("Context copied to clipboard.")
+            total_tokens = count_tokens(context_block, model)
+            _echo_success(f"Context copied to clipboard ({total_tokens:,} tokens).")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
