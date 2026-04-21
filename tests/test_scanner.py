@@ -244,3 +244,57 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_excludes_sensitive_files(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("private key")
+        (tmp_path / ".npmrc").write_text("npm config")
+        (tmp_path / "safe.py").write_text("print(1)")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "safe.py" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert ".npmrc" not in rel_paths
+
+    def test_excludes_sensitive_extensions(self, tmp_path: Path):
+        (tmp_path / "cert.pem").write_text("cert")
+        (tmp_path / "key.key").write_text("key")
+        (tmp_path / "main.py").write_text("print(1)")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "main.py" in rel_paths
+        assert "cert.pem" not in rel_paths
+        assert "key.key" not in rel_paths
+
+    def test_refined_env_exclusion(self, tmp_path: Path):
+        (tmp_path / ".env").write_text("secret")
+        (tmp_path / ".env.secret").write_text("more secret")
+        (tmp_path / ".env.example").write_text("example config")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert ".env.example" in rel_paths
+        assert ".env" not in rel_paths
+        assert ".env.secret" not in rel_paths
+
+    def test_skips_non_regular_files(self, tmp_path: Path):
+        import os
+
+        (tmp_path / "regular.txt").write_text("content")
+
+        fifo_path = tmp_path / "my_fifo"
+        try:
+            os.mkfifo(fifo_path)
+        except (AttributeError, OSError):
+            # Fallback if FIFOs aren't supported (e.g. Windows)
+            pytest.skip("FIFOs not supported in this environment")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "regular.txt" in rel_paths
+        assert "my_fifo" not in rel_paths

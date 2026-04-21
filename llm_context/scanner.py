@@ -106,6 +106,15 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "pyc",
         "pyo",
         "class",
+        # Certificates / keys
+        "pem",
+        "key",
+        "crt",
+        "p12",
+        "pfx",
+        "asc",
+        "gpg",
+        "jks",
     }
 )
 
@@ -130,6 +139,14 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        # SSH keys
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        # Configs
+        ".npmrc",
+        ".netrc",
     }
 )
 
@@ -221,6 +238,9 @@ def _should_skip_file(
     """
     if filename in _EXCLUDED_FILENAMES:
         return True
+    if filename.startswith(".env") and not filename.endswith(".example"):
+        # Exclude all .env files (e.g. .env, .env.secret) except .env.example
+        return True
     if ext in _EXCLUDED_EXTENSIONS:
         return True
     if _matches_gitignore(rel_path, gitignore_patterns):
@@ -264,7 +284,8 @@ def _iter_files(
 
         for filename in filenames:
             filepath = current_dir / filename
-            if filepath.is_symlink():
+            # Skip symbolic links and non-regular files (FIFOs, sockets, devices) to prevent DoS
+            if filepath.is_symlink() or not filepath.is_file():
                 continue
 
             try:
