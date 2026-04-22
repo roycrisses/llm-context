@@ -16,7 +16,7 @@ from typing import Optional
 
 import click
 
-from llm_context.context import build_context_block
+from llm_context.context import build_context_block, context_token_count
 from llm_context.ranker import rank_files
 from llm_context.scanner import scan_directory
 from llm_context.trimmer import MODEL_TOKEN_LIMITS, get_token_limit, trim_to_budget
@@ -48,6 +48,7 @@ def _echo_success(msg: str) -> None:
 @click.argument(
     "directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    default=".",
 )
 @click.option(
     "--ask",
@@ -143,7 +144,7 @@ def main(
 
     # ── 1. Scan ─────────────────────────────────────────────────────────────
     if verbose:
-        _echo_info(f"Scanning '{directory}' …")
+        _echo_info(f"🔍 Scanning '{directory}' …")
 
     try:
         files = scan_directory(
@@ -167,7 +168,7 @@ def main(
 
     # ── 2. Rank ─────────────────────────────────────────────────────────────
     if verbose:
-        _echo_info("Ranking files by relevance …")
+        _echo_info("📊 Ranking files by relevance …")
 
     try:
         ranked = rank_files(files, ask)
@@ -197,23 +198,28 @@ def main(
         sys.exit(1)
 
     # ── 5. Output ───────────────────────────────────────────────────────────
+    tokens = context_token_count(context_block, model=model)
+    stats = f"{len(trimmed)} files ({tokens:,} tokens)"
+
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'.")
+            _echo_success(f"✨ Saved {stats} to '{output}'.")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
     elif not do_send:
         # Default: print to stdout
         click.echo(context_block)
+        if not verbose:
+            _echo_info(f"Generated {stats}.")
 
     if do_copy:
         try:
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success("Context copied to clipboard.")
+            _echo_success(f"✨ Copied {stats} to clipboard.")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
@@ -221,8 +227,7 @@ def main(
 
     # ── 6. Send ─────────────────────────────────────────────────────────────
     if do_send:
-        if verbose:
-            _echo_info(f"Sending context to '{model}' …")
+        _echo_info(f"🚀 Sending {stats} to '{model}' …")
 
         try:
             from llm_context.llm import send
