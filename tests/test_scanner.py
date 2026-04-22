@@ -244,3 +244,57 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_excludes_sensitive_filenames(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("private key")
+        (tmp_path / ".npmrc").write_text("auth")
+        (tmp_path / "normal.py").write_text("print(1)")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.py" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert ".npmrc" not in rel_paths
+
+    def test_excludes_sensitive_extensions(self, tmp_path: Path):
+        (tmp_path / "cert.pem").write_text("cert")
+        (tmp_path / "key.key").write_text("key")
+        (tmp_path / "script.sh").write_text("echo 1")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "script.sh" in rel_paths
+        assert "cert.pem" not in rel_paths
+        assert "key.key" not in rel_paths
+
+    def test_refined_env_exclusion(self, tmp_path: Path):
+        (tmp_path / ".env").write_text("secret")
+        (tmp_path / ".env.dev").write_text("secret")
+        (tmp_path / ".env.example").write_text("template")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert ".env.example" in rel_paths
+        assert ".env" not in rel_paths
+        assert ".env.dev" not in rel_paths
+
+    def test_skips_non_regular_files(self, tmp_path: Path):
+        import os
+        import stat
+
+        fifo_path = tmp_path / "my_fifo"
+        try:
+            os.mkfifo(fifo_path)
+        except (AttributeError, OSError):
+            pytest.skip("FIFOs not supported on this platform")
+
+        (tmp_path / "normal.txt").write_text("content")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert "my_fifo" not in rel_paths
