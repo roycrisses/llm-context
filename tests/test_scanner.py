@@ -244,3 +244,50 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_excludes_sensitive_files(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("key")
+        (tmp_path / ".npmrc").write_text("token")
+        (tmp_path / "cert.pem").write_text("cert")
+        (tmp_path / "main.py").write_text("print(1)")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "main.py" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert ".npmrc" not in rel_paths
+        assert "cert.pem" not in rel_paths
+
+    def test_refined_env_exclusion(self, tmp_path: Path):
+        (tmp_path / ".env").write_text("S=1")
+        (tmp_path / ".env.test").write_text("S=1")
+        (tmp_path / ".env.example").write_text("S=1")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert ".env.example" in rel_paths
+        assert ".env" not in rel_paths
+        assert ".env.test" not in rel_paths
+
+    def test_skips_non_regular_files(self, tmp_path: Path):
+        import socket
+
+        (tmp_path / "normal.txt").write_text("content")
+
+        # Create a socket file (if possible in this environment)
+        socket_path = tmp_path / "test.sock"
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                s.bind(str(socket_path))
+
+                files = scan_directory(tmp_path)
+                rel_paths = [f["rel_path"] for f in files]
+
+                assert "normal.txt" in rel_paths
+                assert "test.sock" not in rel_paths
+        except (OSError, AttributeError):
+            # Fallback for environments where we can't easily create a socket
+            # We already tested regular files and symlinks.
+            pytest.skip("Could not create UNIX socket for testing")
