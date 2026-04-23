@@ -106,6 +106,14 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "pyc",
         "pyo",
         "class",
+        # Sensitive / Security
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "asc",
     }
 )
 
@@ -130,6 +138,12 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        ".npmrc",
+        ".netrc",
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
     }
 )
 
@@ -219,6 +233,10 @@ def _should_skip_file(
       - .gitignore patterns
       - User-supplied extra exclusion globs
     """
+    # Security: Exclude all .env files except .env.example
+    if filename.startswith(".env") and filename != ".env.example":
+        return True
+
     if filename in _EXCLUDED_FILENAMES:
         return True
     if ext in _EXCLUDED_EXTENSIONS:
@@ -257,14 +275,22 @@ def _iter_files(
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         current_dir = Path(dirpath)
 
-        # Prune excluded directories and symbolic links in-place so os.walk won't descend into them
+        # Prune excluded directories and symbolic links in-place so os.walk won't descend into them.
+        # We also skip non-regular files (like FIFOs) to prevent DoS.
         dirnames[:] = [
-            d for d in dirnames if not _should_skip_dir(d) and not (current_dir / d).is_symlink()
+            d
+            for d in dirnames
+            if not _should_skip_dir(d)
+            and not (current_dir / d).is_symlink()
+            and (current_dir / d).is_dir()
         ]
 
         for filename in filenames:
             filepath = current_dir / filename
-            if filepath.is_symlink():
+
+            # Security: Always skip symbolic links and non-regular files (FIFOs, sockets, devices)
+            # to prevent path traversal, infinite recursion, and DoS attacks.
+            if filepath.is_symlink() or not filepath.is_file():
                 continue
 
             try:
