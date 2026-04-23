@@ -188,3 +188,17 @@ class TestRankFiles:
         r1 = rank_files(files, "function")
         r2 = rank_files(files, "function")
         assert [f["rel_path"] for f in r1] == [f["rel_path"] for f in r2]
+
+    def test_camelcase_split_fixed(self):
+        tokens = _tokenize("getUserName")
+        assert "get" in tokens
+        assert "user" in tokens
+        assert "name" in tokens
+        assert "getusername" in tokens
+
+    def test_snake_case_split(self):
+        tokens = _tokenize("get_user_name")
+        assert "get" in tokens
+        assert "user" in tokens
+        assert "name" in tokens
+        assert "get_user_name" in tokens
