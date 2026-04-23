@@ -244,3 +244,47 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_excludes_sensitive_files(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("private key")
+        (tmp_path / "cert.pem").write_text("certificate")
+        (tmp_path / ".npmrc").write_text("npm config")
+        (tmp_path / "normal.py").write_text("print('hello')")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.py" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert "cert.pem" not in rel_paths
+        assert ".npmrc" not in rel_paths
+
+    def test_refined_env_rules(self, tmp_path: Path):
+        (tmp_path / ".env").write_text("SECRET=123")
+        (tmp_path / ".env.production").write_text("SECRET=456")
+        (tmp_path / ".env.example").write_text("SECRET=your_key")
+        (tmp_path / "normal.py").write_text("print('hello')")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.py" in rel_paths
+        assert ".env.example" in rel_paths
+        assert ".env" not in rel_paths
+        assert ".env.production" not in rel_paths
+
+    def test_skips_non_regular_files(self, tmp_path: Path):
+        import os
+
+        (tmp_path / "normal.txt").write_text("normal content")
+        fifo_path = tmp_path / "my_fifo"
+        try:
+            os.mkfifo(fifo_path)
+        except (OSError, AttributeError):
+            pytest.skip("FIFOs not supported on this platform")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert "my_fifo" not in rel_paths

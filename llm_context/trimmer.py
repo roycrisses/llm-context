@@ -79,6 +79,8 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     int
         Estimated token count.
     """
+    if not text:
+        return 0
     enc = _get_tiktoken_encoder(model)
     if enc is not None:
         try:
@@ -170,7 +172,7 @@ def trim_to_budget(
     files: List[FileInfo],
     model: str = _DEFAULT_MODEL,
     max_tokens: Optional[int] = None,
-    header_tokens: int = _OVERHEAD_TOKENS,
+    header_tokens: Optional[int] = None,
 ) -> List[FileInfo]:
     """
     Select as many ranked files as possible within the token budget, and
@@ -193,7 +195,8 @@ def trim_to_budget(
     max_tokens:
         Override the model's default token limit.
     header_tokens:
-        Tokens to reserve for the context header/footer.
+        Tokens to reserve for the context header/footer. If None, it is
+        calculated based on the total budget to prevent immediate exhaustion.
 
     Returns
     -------
@@ -202,8 +205,13 @@ def trim_to_budget(
         that fit within the budget.  Contents of trimmed files are updated
         in-place on copies of the originals.
     """
-    budget = max_tokens if max_tokens is not None else get_token_limit(model)
-    budget = max(0, budget - header_tokens)
+    total_budget = max_tokens if max_tokens is not None else get_token_limit(model)
+
+    if header_tokens is None:
+        # Dynamic overhead: use a smaller overhead for small budgets
+        header_tokens = min(_OVERHEAD_TOKENS, max(50, total_budget // 4))
+
+    budget = max(0, total_budget - header_tokens)
 
     result: List[FileInfo] = []
     remaining = budget
