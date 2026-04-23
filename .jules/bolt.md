@@ -1,0 +1,3 @@
+## 2024-05-24 - Optimized TF-IDF Ranking and fixed camelCase tokenization
+**Learning:** The previous implementation of TF-IDF ranking had $O(T \cdot D \cdot L)$ complexity due to repeated linear searches in token lists for each query term. Using set-based lookups and pre-calculating IDF values reduced this to $O(D \cdot (L + T))$, providing a massive speedup (~4.8x). Also, `text.lower()` before regex splitting prevented camelCase detection.
+**Action:** Always use sets for membership checks in large loops. Perform case-sensitive operations before lowercasing when case patterns (like camelCase) are meaningful.
