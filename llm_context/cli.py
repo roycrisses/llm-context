@@ -32,11 +32,18 @@ def _echo_error(msg: str) -> None:
 
 
 def _echo_info(msg: str) -> None:
-    click.echo(click.style(msg, fg="cyan"), err=True)
+    emoji = "🔍"
+    if "Found" in msg or "Including" in msg or "Ranking" in msg:
+        emoji = "📊"
+    elif "Trimming" in msg:
+        emoji = "✂️"
+    elif "Sending" in msg:
+        emoji = "🚀"
+    click.echo(click.style(f"{emoji} {msg}", fg="cyan"), err=True)
 
 
 def _echo_success(msg: str) -> None:
-    click.echo(click.style(msg, fg="green"), err=True)
+    click.echo(click.style(f"✨ {msg}", fg="green"), err=True)
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +54,7 @@ def _echo_success(msg: str) -> None:
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument(
     "directory",
+    default=".",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
 @click.option(
@@ -221,8 +229,7 @@ def main(
 
     # ── 6. Send ─────────────────────────────────────────────────────────────
     if do_send:
-        if verbose:
-            _echo_info(f"Sending context to '{model}' …")
+        _echo_info(f"Sending context to '{model}' …")
 
         try:
             from llm_context.llm import send
