@@ -1,0 +1,3 @@
+## 2026-05-22 - Informative CLI Feedback and Sensible Defaults
+**Learning:** In LLM context tools, users are highly sensitive to token limits and file inclusion. Providing immediate feedback on total tokens and file counts in success messages reduces anxiety and helps users verify the output without checking the file manually. Additionally, defaulting the directory argument to the current directory (`.`) aligns with standard CLI expectations and reduces friction.
+**Action:** Always provide quantitative feedback (counts, sizes, tokens) for operations that generate large data blocks, and ensure required path arguments have sensible defaults when applicable.

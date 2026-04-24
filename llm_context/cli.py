@@ -32,11 +32,20 @@ def _echo_error(msg: str) -> None:
 
 
 def _echo_info(msg: str) -> None:
-    click.echo(click.style(msg, fg="cyan"), err=True)
+    emoji = ""
+    if "Scanning" in msg or "Found" in msg:
+        emoji = "🔍 "
+    elif "Ranking" in msg:
+        emoji = "📊 "
+    elif "Trimming" in msg or "Including" in msg:
+        emoji = "✂️ "
+    elif "Sending" in msg:
+        emoji = "🚀 "
+    click.echo(click.style(f"{emoji}{msg}", fg="cyan"), err=True)
 
 
 def _echo_success(msg: str) -> None:
-    click.echo(click.style(msg, fg="green"), err=True)
+    click.echo(click.style(f"✨ {msg}", fg="green"), err=True)
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +56,7 @@ def _echo_success(msg: str) -> None:
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument(
     "directory",
+    default=".",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
 @click.option(
@@ -197,23 +207,30 @@ def main(
         sys.exit(1)
 
     # ── 5. Output ───────────────────────────────────────────────────────────
+    from llm_context.context import context_token_count
+
+    tokens = context_token_count(context_block, model=model)
+    stats = f"({tokens:,} tokens, {len(trimmed)} files)"
+
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'.")
+            _echo_success(f"Context saved to '{output}' {stats}.")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
     elif not do_send:
         # Default: print to stdout
         click.echo(context_block)
+        if not verbose:
+            _echo_info(f"Generated context block {stats}.")
 
     if do_copy:
         try:
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success("Context copied to clipboard.")
+            _echo_success(f"Context copied to clipboard {stats}.")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
