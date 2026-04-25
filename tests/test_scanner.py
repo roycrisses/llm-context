@@ -244,3 +244,41 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_excludes_sensitive_files(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("private key")
+        (tmp_path / ".npmrc").write_text("npm token")
+        (tmp_path / "normal.py").write_text("print('hi')")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.py" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert ".npmrc" not in rel_paths
+
+    def test_excludes_sensitive_extensions(self, tmp_path: Path):
+        (tmp_path / "cert.pem").write_text("cert")
+        (tmp_path / "key.key").write_text("key")
+        (tmp_path / "script.py").write_text("print('hi')")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "script.py" in rel_paths
+        assert "cert.pem" not in rel_paths
+        assert "key.key" not in rel_paths
+
+    def test_excludes_all_env_except_example(self, tmp_path: Path):
+        (tmp_path / ".env").write_text("secret")
+        (tmp_path / ".env.production").write_text("prod secret")
+        (tmp_path / ".env.example").write_text("template")
+        (tmp_path / "normal.txt").write_text("normal")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert ".env.example" in rel_paths
+        assert ".env" not in rel_paths
+        assert ".env.production" not in rel_paths
