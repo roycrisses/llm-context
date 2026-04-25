@@ -16,7 +16,7 @@ from typing import Optional
 
 import click
 
-from llm_context.context import build_context_block
+from llm_context.context import build_context_block, context_token_count
 from llm_context.ranker import rank_files
 from llm_context.scanner import scan_directory
 from llm_context.trimmer import MODEL_TOKEN_LIMITS, get_token_limit, trim_to_budget
@@ -32,11 +32,21 @@ def _echo_error(msg: str) -> None:
 
 
 def _echo_info(msg: str) -> None:
-    click.echo(click.style(msg, fg="cyan"), err=True)
+    prefix = ""
+    if msg.startswith("Scanning"):
+        prefix = "🔍 "
+    elif msg.startswith("Ranking"):
+        prefix = "📊 "
+    elif msg.startswith("Trimming"):
+        prefix = "✂️ "
+    elif msg.startswith("Sending"):
+        prefix = "🚀 "
+
+    click.echo(click.style(f"{prefix}{msg}", fg="cyan"), err=True)
 
 
 def _echo_success(msg: str) -> None:
-    click.echo(click.style(msg, fg="green"), err=True)
+    click.echo(click.style(f"✨ {msg}", fg="green"), err=True)
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +58,8 @@ def _echo_success(msg: str) -> None:
 @click.argument(
     "directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    default=".",
+    required=False,
 )
 @click.option(
     "--ask",
@@ -197,10 +209,12 @@ def main(
         sys.exit(1)
 
     # ── 5. Output ───────────────────────────────────────────────────────────
+    total_tokens = context_token_count(context_block, model=model)
+
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'.")
+            _echo_success(f"Context ({len(trimmed)} files, {total_tokens:,} tokens) saved to '{output}'.")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
@@ -213,7 +227,7 @@ def main(
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success("Context copied to clipboard.")
+            _echo_success(f"Context ({len(trimmed)} files, {total_tokens:,} tokens) copied to clipboard.")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
