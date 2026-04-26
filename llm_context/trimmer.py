@@ -79,6 +79,8 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     int
         Estimated token count.
     """
+    if not text:
+        return 0
     enc = _get_tiktoken_encoder(model)
     if enc is not None:
         try:
@@ -86,7 +88,7 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
         except Exception:
             pass
     # Fallback: 1 token ≈ 4 characters (commonly cited rule of thumb)
-    return max(1, len(text) // 4)
+    return len(text) // 4
 
 
 def get_token_limit(model: str) -> int:

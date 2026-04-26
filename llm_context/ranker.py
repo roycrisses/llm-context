@@ -27,13 +27,20 @@ def _tokenize(text: str) -> List[str]:
     Extract lowercase alphanumeric tokens from *text*.
     Splits on punctuation, whitespace, and underscores intelligently.
     """
-    raw = _TOKEN_RE.findall(text.lower())
+    # Find tokens first, then handle sub-token splitting before lowercasing
+    raw = _TOKEN_RE.findall(text)
     expanded: List[str] = []
     for tok in raw:
-        # Also split camelCase / snake_case into sub-tokens
+        # Split camelCase
         parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
-        expanded.extend(p.lower() for p in parts)
-        expanded.append(tok)
+        for p in parts:
+            # Also split snake_case
+            sub_parts = p.split("_")
+            if len(sub_parts) > 1:
+                expanded.extend(sp.lower() for sp in sub_parts if sp)
+            expanded.append(p.lower())
+        if len(parts) > 1 or "_" in tok:
+            expanded.append(tok.lower())
     return expanded
 
 
