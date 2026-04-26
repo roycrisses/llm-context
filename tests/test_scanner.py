@@ -244,3 +244,19 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_excludes_sensitive_files(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("key")
+        (tmp_path / "cert.pem").write_text("cert")
+        (tmp_path / ".env.staging").write_text("env")
+        (tmp_path / ".env.example").write_text("example")
+        (tmp_path / "normal.py").write_text("print(1)")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.py" in rel_paths
+        assert ".env.example" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert "cert.pem" not in rel_paths
+        assert ".env.staging" not in rel_paths
