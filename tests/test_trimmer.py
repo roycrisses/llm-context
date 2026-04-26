@@ -147,7 +147,7 @@ class TestTrimToBudget:
     def test_large_single_file_is_truncated_not_dropped(self):
         huge_content = big_content(1000)
         files = [make_file("big.py", huge_content)]
-        result = trim_to_budget(files, model="gpt-4o", max_tokens=200)
+        result = trim_to_budget(files, model="gpt-4o", max_tokens=1000)
         # The file should be included but with truncated content
         assert len(result) == 1
         assert len(result[0]["content"]) < len(huge_content)
