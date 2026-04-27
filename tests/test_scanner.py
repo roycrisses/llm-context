@@ -244,3 +244,61 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_excludes_all_env_except_example(self, tmp_path: Path):
+        (tmp_path / ".env").write_text("a")
+        (tmp_path / ".env.local").write_text("a")
+        (tmp_path / ".env.secret").write_text("a")
+        (tmp_path / ".env.example").write_text("a")
+        (tmp_path / "normal.txt").write_text("a")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert ".env.example" in rel_paths
+        assert ".env" not in rel_paths
+        assert ".env.local" not in rel_paths
+        assert ".env.secret" not in rel_paths
+
+    def test_excludes_sensitive_extensions(self, tmp_path: Path):
+        (tmp_path / "key.pem").write_text("a")
+        (tmp_path / "cert.crt").write_text("a")
+        (tmp_path / "secret.gpg").write_text("a")
+        (tmp_path / "normal.txt").write_text("a")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert "key.pem" not in rel_paths
+        assert "cert.crt" not in rel_paths
+        assert "secret.gpg" not in rel_paths
+
+    def test_excludes_sensitive_filenames(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("a")
+        (tmp_path / ".npmrc").write_text("a")
+        (tmp_path / "normal.txt").write_text("a")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert ".npmrc" not in rel_paths
+
+    def test_skips_non_regular_files(self, tmp_path: Path):
+        import os
+        fifo_path = tmp_path / "my_fifo"
+        try:
+            os.mkfifo(fifo_path)
+        except AttributeError:
+            pytest.skip("os.mkfifo not available")
+
+        (tmp_path / "normal.txt").write_text("a")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.txt" in rel_paths
+        assert "my_fifo" not in rel_paths
