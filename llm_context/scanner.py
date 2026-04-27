@@ -106,15 +106,21 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "pyc",
         "pyo",
         "class",
+        # Sensitive / Credentials
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
     }
 )
 
 _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
     {
-        ".env",
-        ".env.local",
-        ".env.production",
-        ".env.development",
         ".DS_Store",
         "Thumbs.db",
         "package-lock.json",
@@ -130,6 +136,18 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        # Sensitive / Credentials
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
+        ".shsh",
+        ".secret",
+        ".token",
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "authorized_keys",
     }
 )
 
@@ -223,6 +241,12 @@ def _should_skip_file(
         return True
     if ext in _EXCLUDED_EXTENSIONS:
         return True
+
+    # Exclude all .env files (e.g. .env.production, .env.secret)
+    # except for .env.example which is usually safe and informative.
+    if filename.startswith(".env") and filename != ".env.example":
+        return True
+
     if _matches_gitignore(rel_path, gitignore_patterns):
         return True
     if extra_excludes:
@@ -264,7 +288,10 @@ def _iter_files(
 
         for filename in filenames:
             filepath = current_dir / filename
-            if filepath.is_symlink():
+
+            # Security: skip symbolic links and non-regular files (FIFOs, sockets, devices)
+            # to prevent path traversal and DoS (hanging on special files).
+            if filepath.is_symlink() or not filepath.is_file():
                 continue
 
             try:
