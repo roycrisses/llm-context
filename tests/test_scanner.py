@@ -4,6 +4,7 @@ tests/test_scanner.py — Unit tests for llm_context.scanner
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,20 @@ class TestShouldSkipDir:
 class TestShouldSkipFile:
     def test_excludes_env_file(self):
         assert _should_skip_file(".env", "", ".env", [], None) is True
+        assert _should_skip_file(".env.production", "", ".env.production", [], None) is True
+        assert _should_skip_file(".env.secret", "", ".env.secret", [], None) is True
+
+    def test_allows_env_example(self):
+        assert _should_skip_file(".env.example", "", ".env.example", [], None) is False
+
+    def test_excludes_sensitive_files(self):
+        assert _should_skip_file(".npmrc", "", ".npmrc", [], None) is True
+        assert _should_skip_file("id_rsa", "", "id_rsa", [], None) is True
+        assert _should_skip_file("authorized_keys", "", "authorized_keys", [], None) is True
+
+    def test_excludes_sensitive_extensions(self):
+        assert _should_skip_file("cert.pem", "pem", "cert.pem", [], None) is True
+        assert _should_skip_file("key.key", "key", "key.key", [], None) is True
 
     def test_excludes_png(self):
         assert _should_skip_file("logo.png", "png", "logo.png", [], None) is True
@@ -244,3 +259,21 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_skips_non_regular_files(self, tmp_path: Path):
+        (tmp_path / "regular.txt").write_text("content")
+
+        # Create a FIFO (named pipe) if possible
+        fifo_path = tmp_path / "my_fifo"
+        try:
+            os.mkfifo(fifo_path)
+        except (AttributeError, OSError):
+            # Fallback for systems without mkfifo (like some Windows environments, though sandbox is Linux)
+            pass
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "regular.txt" in rel_paths
+        if fifo_path.exists():
+            assert "my_fifo" not in rel_paths
