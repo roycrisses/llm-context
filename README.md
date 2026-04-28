@@ -21,41 +21,41 @@ pip install llm-context
 ### 1. Diagnose a bug without sending to an LLM (output to terminal)
 
 ```bash
-llm-context ./my-project --ask "why is auth broken?"
+llm-context --ask "why is auth broken?"
 ```
 
 ### 2. Send directly to GPT-4 and get an answer
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-llm-context ./my-project --ask "explain the data models" --model gpt-4 --send
+llm-context ./src --ask "explain the data models" --model gpt-4 --send
 ```
 
 ### 3. Copy context for Claude and paste it yourself
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
-llm-context ./my-project --ask "refactor to async" --model claude --copy
+llm-context --ask "refactor to async" --model claude --copy
 ```
 
 ### 4. Save context to a file for later
 
 ```bash
-llm-context ./my-project --ask "how does caching work?" --output context.txt
+llm-context --ask "how does caching work?" --output context.txt
 ```
 
 ### 5. Use with Gemini and override token limit
 
 ```bash
 export GEMINI_API_KEY="AIza..."
-llm-context ./my-project --ask "summarise this repo" \
+llm-context --ask "summarise this repo" \
   --model gemini --max-tokens 500000 --send
 ```
 
 ### 6. Include/exclude specific file patterns
 
 ```bash
-llm-context ./my-project --ask "review API routes" \
+llm-context --ask "review API routes" \
   --include "routes/*.py" --exclude "*.test.py" --send
 ```
 
