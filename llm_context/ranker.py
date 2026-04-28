@@ -20,6 +20,7 @@ from llm_context.scanner import FileInfo
 # ---------------------------------------------------------------------------
 
 _TOKEN_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_CAMEL_RE = re.compile(r"([a-z])([A-Z])")
 
 
 def _tokenize(text: str) -> List[str]:
@@ -27,13 +28,25 @@ def _tokenize(text: str) -> List[str]:
     Extract lowercase alphanumeric tokens from *text*.
     Splits on punctuation, whitespace, and underscores intelligently.
     """
-    raw = _TOKEN_RE.findall(text.lower())
+    # Extract tokens without lowercasing first to preserve camelCase
+    raw = _TOKEN_RE.findall(text)
     expanded: List[str] = []
     for tok in raw:
-        # Also split camelCase / snake_case into sub-tokens
-        parts = re.sub(r"([a-z])([A-Z])", r"\1 \2", tok).split()
-        expanded.extend(p.lower() for p in parts)
-        expanded.append(tok)
+        lowered = tok.lower()
+        expanded.append(lowered)
+
+        # Split snake_case
+        if "_" in lowered:
+            parts = lowered.split("_")
+            if len(parts) > 1:
+                expanded.extend(p for p in parts if p)
+
+        # Split camelCase - only if token has mixed case to avoid regex overhead
+        if not tok.islower() and not tok.isupper():
+            parts = _CAMEL_RE.sub(r"\1 \2", tok).split()
+            if len(parts) > 1:
+                expanded.extend(p.lower() for p in parts)
+
     return expanded
 
 
@@ -70,31 +83,33 @@ def _compute_tfidf_scores(
 
     # Tokenize documents (path + content)
     doc_tokens: List[List[str]] = []
+    doc_sets: List[set[str]] = []
     for f in files:
-        combined = f["rel_path"] + " " + f["content"]
-        doc_tokens.append(_tokenize(combined))
+        tokens = _tokenize(f["rel_path"] + " " + f["content"])
+        doc_tokens.append(tokens)
+        doc_sets.append(set(tokens))
 
-    # Document frequency for query terms only (faster)
-    df: dict[str, int] = {}
+    # Document frequency for query terms only
+    df: dict[str, int] = {term: 0 for term in query_terms}
+    query_set = set(query_terms)
+    for dset in doc_sets:
+        # Intersection is faster for large queries
+        for term in (query_set & dset):
+            df[term] += 1
+
+    # Pre-calculate IDFs
+    idfs: dict[str, float] = {}
     for term in query_terms:
-        for tokens in doc_tokens:
-            if term in tokens:
-                df[term] = df.get(term, 0) + 1
+        idfs[term] = math.log((n_docs + 1) / (df[term] + 1)) + 1.0
 
     scores: List[float] = []
     for tokens in doc_tokens:
         tf = _term_frequency(tokens)
         doc_len = max(len(tokens), 1)
         score = 0.0
-        for term in query_terms:
-            raw_tf = tf.get(term, 0)
-            if raw_tf == 0:
-                continue
-            # Normalised TF
-            normalised_tf = raw_tf / doc_len
-            # Smoothed IDF
-            idf = math.log((n_docs + 1) / (df.get(term, 0) + 1)) + 1.0
-            score += normalised_tf * idf
+        # Only iterate over query terms present in this document
+        for term in (query_set & tf.keys()):
+            score += (tf[term] / doc_len) * idfs[term]
         scores.append(score)
 
     return scores
@@ -118,12 +133,12 @@ def _filename_boost(rel_path: str, query_terms: List[str]) -> float:
     return 0.15 * hits
 
 
-def _recency_boost(mtime: float) -> float:
+def _recency_boost(mtime: float, now: float) -> float:
     """
     Return a small additive boost for files modified within the last week.
     Boost decays linearly from 0.10 → 0.0 over the recency window.
     """
-    age = time.time() - mtime
+    age = now - mtime
     if age < 0:
         return 0.10
     if age >= _RECENCY_WINDOW_SECONDS:
@@ -175,10 +190,11 @@ def rank_files(files: List[FileInfo], query: str) -> List[FileInfo]:
 
     tfidf_scores = _compute_tfidf_scores(files, query_terms)
 
+    now = time.time()
     scored: List[tuple[float, int]] = []
     for idx, (f, base_score) in enumerate(zip(files, tfidf_scores)):
         total = (
-            base_score + _filename_boost(f["rel_path"], query_terms) + _recency_boost(f["mtime"])
+            base_score + _filename_boost(f["rel_path"], query_terms) + _recency_boost(f["mtime"], now)
         )
         scored.append((total, idx))
 
