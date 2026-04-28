@@ -16,7 +16,7 @@ from typing import Optional
 
 import click
 
-from llm_context.context import build_context_block
+from llm_context.context import build_context_block, context_token_count
 from llm_context.ranker import rank_files
 from llm_context.scanner import scan_directory
 from llm_context.trimmer import MODEL_TOKEN_LIMITS, get_token_limit, trim_to_budget
@@ -48,6 +48,8 @@ def _echo_success(msg: str) -> None:
 @click.argument(
     "directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    default=".",
+    required=False,
 )
 @click.option(
     "--ask",
@@ -127,15 +129,15 @@ def main(
     verbose: bool,
 ) -> None:
     """
-    Analyze DIRECTORY, find files relevant to your --ask question, and
-    assemble a ready-to-use LLM context block.
+    Analyze DIRECTORY (defaults to current dir), find files relevant to your
+    --ask question, and assemble a ready-to-use LLM context block.
 
     \b
     Examples
     --------
-      llm-context ./my-project --ask "why is auth broken?"
-      llm-context ./src --ask "explain the data models" --model gpt-4 --send
-      llm-context . --ask "refactor to async" --model claude --copy
+      llm-context --ask "why is auth broken?"
+      llm-context ./src --ask "explain the data models" --send
+      llm-context --ask "refactor to async" --copy
     """
     model = model.lower()
     extra_includes = list(include) if include else None
@@ -197,10 +199,14 @@ def main(
         sys.exit(1)
 
     # ── 5. Output ───────────────────────────────────────────────────────────
+    tokens = context_token_count(context_block, model=model)
+
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'.")
+            _echo_success(
+                f"Saved {len(trimmed)} files ({tokens:,} tokens) to '{output}'."
+            )
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
@@ -213,7 +219,7 @@ def main(
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success("Context copied to clipboard.")
+            _echo_success(f"Copied {len(trimmed)} files ({tokens:,} tokens) to clipboard.")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
