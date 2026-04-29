@@ -106,15 +106,35 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "pyc",
         "pyo",
         "class",
+        # Security / Credentials
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
     }
 )
 
 _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
     {
-        ".env",
-        ".env.local",
-        ".env.production",
-        ".env.development",
+        # SSH keys
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "known_hosts",
+        "authorized_keys",
+        # Credentials / Secrets
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
+        ".shsh",
+        ".secret",
+        ".token",
         ".DS_Store",
         "Thumbs.db",
         "package-lock.json",
@@ -222,6 +242,9 @@ def _should_skip_file(
     if filename in _EXCLUDED_FILENAMES:
         return True
     if ext in _EXCLUDED_EXTENSIONS:
+        return True
+    # Exclude all .env files except .env.example
+    if filename.startswith(".env") and filename != ".env.example":
         return True
     if _matches_gitignore(rel_path, gitignore_patterns):
         return True
