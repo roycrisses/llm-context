@@ -1,0 +1,3 @@
+## 2025-05-14 - Sensible CLI Defaults and Informative Feedback
+**Learning:** For CLI tools that operate on directories, defaulting the target path to the current directory ('.') significantly reduces friction for the most common use case. Additionally, providing immediate feedback on the size of generated artifacts (like token and file counts) helps users manage downstream constraints (like LLM context windows) without manual calculation.
+**Action:** Always consider if a required path argument can be defaulted to '.' and ensure all success paths provide relevant metadata about the action performed.
