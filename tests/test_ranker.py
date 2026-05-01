@@ -113,19 +113,22 @@ class TestFilenameBoost:
 class TestRecencyBoost:
     def test_very_recent_file_gets_boost(self):
         now = time.time()
-        assert _recency_boost(now) > 0.0
+        assert _recency_boost(now, now) > 0.0
 
     def test_old_file_gets_no_boost(self):
-        old = time.time() - (30 * 24 * 3600)  # 30 days ago
-        assert _recency_boost(old) == 0.0
+        now = time.time()
+        old = now - (30 * 24 * 3600)  # 30 days ago
+        assert _recency_boost(old, now) == 0.0
 
     def test_future_mtime_gets_max_boost(self):
-        future = time.time() + 3600
-        assert _recency_boost(future) == pytest.approx(0.10)
+        now = time.time()
+        future = now + 3600
+        assert _recency_boost(future, now) == pytest.approx(0.10)
 
     def test_week_old_file_gets_some_boost(self):
-        week_ago = time.time() - (6 * 24 * 3600)
-        boost = _recency_boost(week_ago)
+        now = time.time()
+        week_ago = now - (6 * 24 * 3600)
+        boost = _recency_boost(week_ago, now)
         assert 0.0 < boost < 0.10
 
 
