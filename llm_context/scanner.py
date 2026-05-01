@@ -52,6 +52,16 @@ _EXCLUDED_DIRS: frozenset[str] = frozenset(
 
 _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
     {
+        # Security / Credentials
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
         # Binary / media
         "png",
         "jpg",
@@ -111,10 +121,6 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
 
 _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
     {
-        ".env",
-        ".env.local",
-        ".env.production",
-        ".env.development",
         ".DS_Store",
         "Thumbs.db",
         "package-lock.json",
@@ -130,6 +136,16 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
+        ".shsh",
+        ".secret",
+        ".token",
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
     }
 )
 
@@ -215,7 +231,7 @@ def _should_skip_file(
 ) -> bool:
     """
     Return True if a file should be excluded from the scan based on:
-      - Hardcoded exclusion lists
+      - Hardcoded exclusion lists (sensitive files, binary, etc.)
       - .gitignore patterns
       - User-supplied extra exclusion globs
     """
@@ -223,6 +239,11 @@ def _should_skip_file(
         return True
     if ext in _EXCLUDED_EXTENSIONS:
         return True
+
+    # Security: Exclude all .env files by pattern, except .env.example
+    if filename.startswith(".env") and filename != ".env.example":
+        return True
+
     if _matches_gitignore(rel_path, gitignore_patterns):
         return True
     if extra_excludes:
