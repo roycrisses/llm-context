@@ -65,7 +65,7 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     Count the number of tokens in *text* for the given *model*.
 
     Uses tiktoken when available (accurate); falls back to
-    ``len(text) // 4`` (fast estimate).
+    ``len(text) // 4`` (fast estimate). Empty strings always return 0.
 
     Parameters
     ----------
@@ -79,6 +79,9 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     int
         Estimated token count.
     """
+    if not text:
+        return 0
+
     enc = _get_tiktoken_encoder(model)
     if enc is not None:
         try:
@@ -227,8 +230,9 @@ def trim_to_budget(
                     remaining - 20,
                     model,  # -20 for fence overhead
                 )
-                # Make a shallow copy with updated content
-                trimmed_file: FileInfo = {**f, "content": trimmed_content}
+                # Make a shallow copy with updated content and truncation status
+                is_truncated = trimmed_content != f["content"]
+                trimmed_file: FileInfo = {**f, "content": trimmed_content, "truncated": is_truncated}
                 result.append(trimmed_file)
             remaining = 0  # Budget exhausted after forced truncation
 
