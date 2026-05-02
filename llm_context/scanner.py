@@ -232,12 +232,18 @@ def _should_skip_file(
     return False
 
 
-def _read_file_content(filepath: Path, max_bytes: int = 5_000_000) -> str:
+def _read_file_content(filepath: Path, max_bytes: int = 5_000_000, size: Optional[int] = None) -> str:
     """
     Attempt to read a file as UTF-8 text.  Returns an empty string when
     the file is binary, unreadable, or exceeds *max_bytes*.
     """
-    if filepath.stat().st_size > max_bytes:
+    if size is None:
+        try:
+            size = filepath.stat().st_size
+        except OSError:
+            return ""
+
+    if size > max_bytes:
         return ""
     try:
         return filepath.read_text(encoding="utf-8", errors="strict")
@@ -257,9 +263,17 @@ def _iter_files(
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         current_dir = Path(dirpath)
 
-        # Prune excluded directories and symbolic links in-place so os.walk won't descend into them
+        # Prune excluded directories and symbolic links in-place so os.walk won't descend into them.
+        # Optimization: also prune gitignored directories if no extra_includes are requested.
         dirnames[:] = [
-            d for d in dirnames if not _should_skip_dir(d) and not (current_dir / d).is_symlink()
+            d
+            for d in dirnames
+            if not _should_skip_dir(d)
+            and not (current_dir / d).is_symlink()
+            and (
+                extra_includes
+                or not _matches_gitignore(str((current_dir / d).relative_to(root)), gitignore_patterns)
+            )
         ]
 
         for filename in filenames:
@@ -292,7 +306,8 @@ def _iter_files(
             except OSError:
                 continue
 
-            content = _read_file_content(filepath)
+            # Pass size to avoid redundant stat() call inside _read_file_content
+            content = _read_file_content(filepath, size=stat.st_size)
 
             yield FileInfo(
                 path=str(filepath),
