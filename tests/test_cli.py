@@ -14,7 +14,7 @@ def test_cli_default_directory():
         result = runner.invoke(main, ["--ask", "hello"])
         assert result.exit_code == 0
         assert "Included" in result.stderr
-        assert "file(s)" in result.stderr
+        assert "1 file" in result.stderr
 
 def test_cli_summary_output():
     """Verify that summary information is printed to stderr."""

@@ -39,6 +39,11 @@ def _echo_success(msg: str) -> None:
     click.echo(click.style(msg, fg="green"), err=True)
 
 
+def _plural(count: int, word: str) -> str:
+    """Simple pluralization helper."""
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
 # ---------------------------------------------------------------------------
 # CLI entrypoint
 # ---------------------------------------------------------------------------
@@ -144,7 +149,7 @@ def main(
 
     # ── 1. Scan ─────────────────────────────────────────────────────────────
     if verbose:
-        _echo_info(f"Scanning '{directory}' …")
+        _echo_info(f"🔍 Scanning '{directory}' …")
 
     try:
         files = scan_directory(
@@ -164,11 +169,11 @@ def main(
         sys.exit(1)
 
     if verbose:
-        _echo_info(f"Found {len(files)} file(s).")
+        _echo_info(f"✅ Found {_plural(len(files), 'file')}.")
 
     # ── 2. Rank ─────────────────────────────────────────────────────────────
     if verbose:
-        _echo_info("Ranking files by relevance …")
+        _echo_info("🎯 Ranking files by relevance …")
 
     try:
         ranked = rank_files(files, ask)
@@ -179,7 +184,7 @@ def main(
     # ── 3. Trim ─────────────────────────────────────────────────────────────
     if verbose:
         token_limit = max_tokens or get_token_limit(model)
-        _echo_info(f"Trimming to {token_limit:,} token budget …")
+        _echo_info(f"✂️ Trimming to {token_limit:,} token budget …")
 
     trimmed = trim_to_budget(ranked, model=model, max_tokens=max_tokens)
 
@@ -188,7 +193,7 @@ def main(
         sys.exit(1)
 
     if verbose:
-        _echo_info(f"Including {len(trimmed)} file(s) in context.")
+        _echo_info(f"📦 Including {_plural(len(trimmed), 'file')} in context.")
 
     # ── 4. Assemble ─────────────────────────────────────────────────────────
     try:
@@ -199,12 +204,25 @@ def main(
 
     # ── 5. Output ───────────────────────────────────────────────────────────
     tokens = context_token_count(context_block, model=model)
-    summary = f"Included {len(trimmed)} file(s) ({tokens:,} tokens)."
+
+    num_included = len(trimmed)
+    num_truncated = sum(1 for f in trimmed if f.get("truncated"))
+    num_omitted = len(files) - num_included
+
+    # Build detail string: " (1 truncated, 2 omitted)"
+    details = []
+    if num_truncated:
+        details.append(f"{num_truncated} truncated")
+    if num_omitted:
+        details.append(f"{num_omitted} omitted")
+    detail_str = f" ({', '.join(details)})" if details else ""
+
+    summary = f"✨ Included {_plural(num_included, 'file')}{detail_str} ({tokens:,} tokens)."
 
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'. {summary}")
+            _echo_success(f"💾 Context saved to '{output}'. {summary}")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
@@ -218,7 +236,7 @@ def main(
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success(f"Context copied to clipboard. {summary}")
+            _echo_success(f"📋 Context copied to clipboard. {summary}")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
@@ -226,8 +244,7 @@ def main(
 
     # ── 6. Send ─────────────────────────────────────────────────────────────
     if do_send:
-        if verbose:
-            _echo_info(f"Sending context to '{model}' …")
+        _echo_info(f"🚀 Sending context to '{model}' …")
 
         try:
             from llm_context.llm import send
