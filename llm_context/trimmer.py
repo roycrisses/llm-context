@@ -228,7 +228,7 @@ def trim_to_budget(
                     model,  # -20 for fence overhead
                 )
                 # Make a shallow copy with updated content
-                trimmed_file: FileInfo = {**f, "content": trimmed_content}
+                trimmed_file: FileInfo = {**f, "content": trimmed_content, "truncated": True}
                 result.append(trimmed_file)
             remaining = 0  # Budget exhausted after forced truncation
 
