@@ -8,10 +8,10 @@ import time
 
 import pytest
 
+from collections import Counter
 from llm_context.ranker import (
     _filename_boost,
     _recency_boost,
-    _term_frequency,
     _tokenize,
     rank_files,
 )
@@ -77,12 +77,12 @@ class TestTokenize:
 
 class TestTermFrequency:
     def test_counts_correctly(self):
-        tf = _term_frequency(["a", "b", "a", "c", "a"])
+        tf = Counter(["a", "b", "a", "c", "a"])
         assert tf["a"] == 3
         assert tf["b"] == 1
 
     def test_empty(self):
-        assert _term_frequency([]) == {}
+        assert Counter([]) == {}
 
 
 # ---------------------------------------------------------------------------
