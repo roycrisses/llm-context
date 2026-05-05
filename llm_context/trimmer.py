@@ -79,6 +79,9 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     int
         Estimated token count.
     """
+    if not text:
+        return 0
+
     enc = _get_tiktoken_encoder(model)
     if enc is not None:
         try:
