@@ -5,3 +5,7 @@
 ## 2025-05-15 - Sensible CLI Defaults
 **Learning:** Requiring a directory argument (even if it's just '.') adds unnecessary friction for the common case of scanning the current project.
 **Action:** Default directory arguments to '.' where appropriate.
+
+## 2025-05-15 - Transparency in Token Trimming
+**Learning:** When building LLM context, users need to know exactly what was left out. Just showing the final token count is not enough; explicitly calling out truncated and omitted files prevents "silent" context loss and helps users tune their query or budget.
+**Action:** Always report counts of truncated and omitted files in context generation summaries.

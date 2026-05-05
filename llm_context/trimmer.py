@@ -79,6 +79,9 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     int
         Estimated token count.
     """
+    if not text:
+        return 0
+
     enc = _get_tiktoken_encoder(model)
     if enc is not None:
         try:
@@ -228,7 +231,7 @@ def trim_to_budget(
                     model,  # -20 for fence overhead
                 )
                 # Make a shallow copy with updated content
-                trimmed_file: FileInfo = {**f, "content": trimmed_content}
+                trimmed_file: FileInfo = {**f, "content": trimmed_content, "truncated": True}
                 result.append(trimmed_file)
             remaining = 0  # Budget exhausted after forced truncation
 
