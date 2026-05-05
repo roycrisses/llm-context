@@ -95,6 +95,16 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "woff",
         "woff2",
         "eot",
+        # Security / Keys
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
         # Lock / generated
         "lock",
         "map",
@@ -115,6 +125,11 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".env.local",
         ".env.production",
         ".env.development",
+        "id_rsa",
+        "id_ed25519",
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
         ".DS_Store",
         "Thumbs.db",
         "package-lock.json",
@@ -219,6 +234,10 @@ def _should_skip_file(
       - .gitignore patterns
       - User-supplied extra exclusion globs
     """
+    # Security: Exclude all .env files except .env.example
+    if filename.startswith(".env") and filename != ".env.example":
+        return True
+
     if filename in _EXCLUDED_FILENAMES:
         return True
     if ext in _EXCLUDED_EXTENSIONS:
