@@ -1,8 +1,6 @@
 
-import pytest
 from click.testing import CliRunner
 from llm_context.cli import main
-import os
 
 def test_cli_default_directory():
     """Verify that DIRECTORY defaults to '.' if not provided."""

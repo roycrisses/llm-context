@@ -10,6 +10,7 @@ import math
 import os
 import re
 import time
+from collections import Counter
 from typing import List
 
 from llm_context.scanner import FileInfo
@@ -20,6 +21,7 @@ from llm_context.scanner import FileInfo
 # ---------------------------------------------------------------------------
 
 _TOKEN_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_CAMEL_RE = re.compile(r"([a-z])([A-Z])")
 
 
 def _tokenize(text: str) -> List[str]:
@@ -29,7 +31,7 @@ def _tokenize(text: str) -> List[str]:
     """
     # 1. Expand camelCase: "getUserName" -> "get User Name"
     # Done before lowercasing so we can detect uppercase boundaries
-    expanded = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    expanded = _CAMEL_RE.sub(r"\1 \2", text)
 
     # 2. Treat underscores as delimiters: "get_user" -> "get user"
     expanded = expanded.replace("_", " ")
@@ -43,14 +45,6 @@ def _tokenize(text: str) -> List[str]:
 
     # Using a list to preserve duplicates (important for TF)
     return raw + original_tokens
-
-
-def _term_frequency(tokens: List[str]) -> dict[str, float]:
-    """Return a dict of term → raw count for *tokens*."""
-    tf: dict[str, float] = {}
-    for tok in tokens:
-        tf[tok] = tf.get(tok, 0) + 1
-    return tf
 
 
 # ---------------------------------------------------------------------------
@@ -76,38 +70,35 @@ def _compute_tfidf_scores(
     if n_docs == 0:
         return []
 
-    # Tokenize documents (path + content)
-    doc_tokens: List[List[str]] = []
-    doc_sets: List[set[str]] = []
+    query_set = set(query_terms)
+    # 1. Single pass to tokenize, compute TF for query terms, and track DF
+    doc_tfs: List[Counter[str]] = []
+    doc_lens: List[int] = []
+    df = Counter()
+
     for f in files:
         tokens = _tokenize(f["rel_path"] + " " + f["content"])
-        doc_tokens.append(tokens)
-        doc_sets.append(set(tokens))
+        doc_len = max(len(tokens), 1)
+        doc_lens.append(doc_len)
 
-    # 1. Document frequency for query terms only
-    # Optimization: use sets for O(1) lookup during DF calculation
-    df: dict[str, int] = {}
-    for term in query_terms:
-        count = sum(1 for s in doc_sets if term in s)
-        df[term] = count
+        # Optimization: Only count terms present in the query
+        tf = Counter(t for t in tokens if t in query_set)
+        doc_tfs.append(tf)
+        # Update document frequency (term present in document)
+        df.update(tf.keys())
 
     # 2. Pre-calculate IDFs for query terms
-    idfs: dict[str, float] = {}
-    for term in query_terms:
-        # Smoothed IDF
-        idfs[term] = math.log((n_docs + 1) / (df[term] + 1)) + 1.0
+    # Smoothed IDF: math.log((n_docs + 1) / (df[term] + 1)) + 1.0
+    idfs: dict[str, float] = {
+        term: math.log((n_docs + 1) / (df[term] + 1)) + 1.0 for term in query_terms
+    }
 
     # 3. Score each document
     scores: List[float] = []
-    for tokens in doc_tokens:
-        tf_counts = _term_frequency(tokens)
-        doc_len = max(len(tokens), 1)
-        score = 0.0
-        for term in query_terms:
-            count = tf_counts.get(term, 0)
-            if count > 0:
-                # Normalised TF * Pre-calculated IDF
-                score += (count / doc_len) * idfs[term]
+    for i in range(n_docs):
+        tf = doc_tfs[i]
+        doc_len = doc_lens[i]
+        score = sum((count / doc_len) * idfs[term] for term, count in tf.items())
         scores.append(score)
 
     return scores
