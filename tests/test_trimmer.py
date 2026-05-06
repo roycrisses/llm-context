@@ -54,9 +54,9 @@ class TestCountTokens:
         assert isinstance(result, int)
         assert result > 0
 
-    def test_empty_string_returns_at_least_one(self):
-        # Our implementation uses max(1, ...)
-        assert count_tokens("") >= 1
+    def test_empty_string_returns_zero(self):
+        # tiktoken returns 0 for empty strings
+        assert count_tokens("") == 0
 
     def test_longer_text_has_more_tokens(self):
         short = count_tokens("hi")
@@ -147,10 +147,12 @@ class TestTrimToBudget:
     def test_large_single_file_is_truncated_not_dropped(self):
         huge_content = big_content(1000)
         files = [make_file("big.py", huge_content)]
-        result = trim_to_budget(files, model="gpt-4o", max_tokens=200)
+        # We need a budget > _OVERHEAD_TOKENS (512) to include anything
+        result = trim_to_budget(files, model="gpt-4o", max_tokens=800)
         # The file should be included but with truncated content
         assert len(result) == 1
         assert len(result[0]["content"]) < len(huge_content)
+        assert result[0]["truncated"] is True
 
     def test_preserves_order(self):
         # Files should remain in their input order (rank order)

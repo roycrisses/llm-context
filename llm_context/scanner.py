@@ -20,6 +20,7 @@ class FileInfo(TypedDict):
     size: int  # File size in bytes
     extension: str  # File extension without the dot (e.g. "py")
     mtime: float  # Last-modified timestamp (Unix epoch)
+    truncated: bool  # Whether the content was truncated to fit token budget
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +302,7 @@ def _iter_files(
                 size=stat.st_size,
                 extension=ext,
                 mtime=stat.st_mtime,
+                truncated=False,
             )
 
 

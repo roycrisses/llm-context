@@ -1,0 +1,88 @@
+---
+CODEBASE CONTEXT
+Question: What is this?
+Model: gpt-4o | Token budget: 1,000 | Files included: 1
+---
+### llm_context/llm.py
+```py
+"""
+llm.py — Send a context block to an LLM provider and return the response.
+
+Supported providers
+-------------------
+- OpenAI  (gpt-4, gpt-4o, …)      → OPENAI_API_KEY
+- Anthropic / Claude               → ANTHROPIC_API_KEY
+- Google Gemini                    → GEMINI_API_KEY
+- Ollama  (local)                  → no key needed
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Optional
+
+
+# ---------------------------------------------------------------------------
+# Provider helpers
+# ---------------------------------------------------------------------------
+
+
+def _require_env(var: str) -> str:
+    """
+    Return the value of environment variable *var*.
+
+    Raises
+    ------
+    EnvironmentError
+        When the variable is not set or is empty.
+    """
+    value = os.environ.get(var, "").strip()
+    if not value:
+        raise EnvironmentError(
+            f"Environment variable '{var}' is not set. Export it before running llm-context."
+        )
+    return value
+
+
+# ---------------------------------------------------------------------------
+# OpenAI
+# ---------------------------------------------------------------------------
+
+
+def _send_openai(context: str, model: str) -> str:
+    """
+    Send *context* to an OpenAI chat model and return the text response.
+
+    Parameters
+    ----------
+    context:
+        The assembled context block.
+    model:
+        OpenAI model identifier (e.g. ``"gpt-4o"``).
+
+    Returns
+    -------
+    str
+        The model's reply text.
+
+    Raises
+    ------
+    EnvironmentError
+        When ``OPENAI_API_KEY`` is missing.
+    ImportError
+        When the ``openai`` package is not installed.
+    """
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise ImportError(
+            "The 'openai' package is required to use OpenAI models. "
+            "Install it with: pip install openai"
+        ) from exc
+
+    api_key = _require_env("OPENAI_API_KEY")
+# ... [247 lines truncated to fit token budget] ...
+```
+---
+END OF CONTEXT. Answer the question: What is this?
+---
