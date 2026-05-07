@@ -102,6 +102,16 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "db",
         "sqlite",
         "sqlite3",
+        # Security / Credentials
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
         # Compiled
         "pyc",
         "pyo",
@@ -111,10 +121,11 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
 
 _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
     {
-        ".env",
-        ".env.local",
-        ".env.production",
-        ".env.development",
+        "id_rsa",
+        "id_ed25519",
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
         ".DS_Store",
         "Thumbs.db",
         "package-lock.json",
@@ -222,6 +233,8 @@ def _should_skip_file(
     if filename in _EXCLUDED_FILENAMES:
         return True
     if ext in _EXCLUDED_EXTENSIONS:
+        return True
+    if filename.startswith(".env") and filename != ".env.example":
         return True
     if _matches_gitignore(rel_path, gitignore_patterns):
         return True
