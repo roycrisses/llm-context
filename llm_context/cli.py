@@ -199,26 +199,37 @@ def main(
 
     # ── 5. Output ───────────────────────────────────────────────────────────
     tokens = context_token_count(context_block, model=model)
-    summary = f"Included {len(trimmed)} file(s) ({tokens:,} tokens)."
+    num_truncated = sum(1 for f in trimmed if f.get("truncated"))
+    num_omitted = len(ranked) - len(trimmed)
+
+    summary_parts = [f"Included {len(trimmed)} file(s)"]
+    if num_truncated > 0:
+        summary_parts.append(f"{num_truncated} truncated")
+    if num_omitted > 0:
+        summary_parts.append(f"{num_omitted} omitted")
+
+    summary = f"{', '.join(summary_parts)}. Total: {tokens:,} tokens."
+
+    # Always echo summary to stderr for immediate feedback
+    _echo_info(summary)
 
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'. {summary}")
+            _echo_success(f"💾 Context saved to '{output}'. ✨")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
     elif not do_send:
         # Default: print to stdout
         click.echo(context_block)
-        _echo_info(summary)
 
     if do_copy:
         try:
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success(f"Context copied to clipboard. {summary}")
+            _echo_success("📋 Context copied to clipboard. ✨")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
@@ -226,8 +237,7 @@ def main(
 
     # ── 6. Send ─────────────────────────────────────────────────────────────
     if do_send:
-        if verbose:
-            _echo_info(f"Sending context to '{model}' …")
+        _echo_info(f"🚀 Sending context to '{model}' …")
 
         try:
             from llm_context.llm import send
