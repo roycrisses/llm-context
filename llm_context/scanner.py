@@ -95,6 +95,16 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "woff",
         "woff2",
         "eot",
+        # Security / Keys
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
         # Lock / generated
         "lock",
         "map",
@@ -130,6 +140,14 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        # Credentials / Keys
+        "id_rsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "id_dsa",
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
     }
 )
 
@@ -220,6 +238,8 @@ def _should_skip_file(
       - User-supplied extra exclusion globs
     """
     if filename in _EXCLUDED_FILENAMES:
+        return True
+    if filename.startswith(".env") and filename != ".env.example":
         return True
     if ext in _EXCLUDED_EXTENSIONS:
         return True
