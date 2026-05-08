@@ -6,9 +6,11 @@ filters out noise files, and returns a list of FileInfo dicts.
 from __future__ import annotations
 
 import fnmatch
+import functools
 import os
+import re
 from pathlib import Path
-from typing import Iterator, List, Optional, TypedDict
+from typing import Iterator, List, Optional, Tuple, TypedDict
 
 
 class FileInfo(TypedDict):
@@ -167,31 +169,62 @@ def _load_gitignore_patterns(root: Path) -> List[str]:
     return patterns
 
 
+@functools.lru_cache(maxsize=128)
+def _compile_gitignore_regex(
+    patterns: Tuple[str, ...]
+) -> Tuple[Optional[re.Pattern], Optional[re.Pattern]]:
+    """
+    Compile gitignore patterns into two combined regular expressions for efficiency.
+    Returns (full_path_re, component_re).
+    """
+    if not patterns:
+        return None, None
+
+    full_parts = []
+    comp_parts = []
+    for pattern in patterns:
+        pat = os.path.normcase(pattern.rstrip("/"))
+        # Patterns for full path matching
+        full_parts.append(fnmatch.translate(pat))
+        full_parts.append(fnmatch.translate(f"**/{pat}"))
+
+        # Patterns for individual component matching
+        if "/" not in pat:
+            comp_parts.append(fnmatch.translate(pat))
+
+    full_re = re.compile("|".join(full_parts)) if full_parts else None
+    comp_re = re.compile("|".join(comp_parts)) if comp_parts else None
+    return full_re, comp_re
+
+
 def _matches_gitignore(rel_path: str, patterns: List[str]) -> bool:
     """
     Return True if *rel_path* matches any of the .gitignore *patterns*.
-    Uses fnmatch for glob-style matching and also checks plain basename.
+    Uses pre-compiled regexes for performance.
     """
+    if not patterns:
+        return False
+
+    full_re, comp_re = _compile_gitignore_regex(tuple(patterns))
+
+    # Normalize path once
+    rel_path = os.path.normcase(rel_path)
     parts = Path(rel_path).parts
     basename = parts[-1] if parts else rel_path
 
-    for pattern in patterns:
-        # Strip trailing slash (directory-only marker) for matching
-        pat = pattern.rstrip("/")
+    # 1. Match against full relative path
+    if full_re and full_re.match(rel_path):
+        return True
 
-        # Match against full relative path or just the basename
-        if fnmatch.fnmatch(rel_path, pat):
-            return True
-        if fnmatch.fnmatch(rel_path, f"**/{pat}"):
-            return True
-        if fnmatch.fnmatch(basename, pat):
-            return True
+    # 2. Match against basename
+    if full_re and full_re.match(basename):
+        return True
 
-        # Match any path component against directory patterns
-        if "/" not in pat:
-            for part in parts:
-                if fnmatch.fnmatch(part, pat):
-                    return True
+    # 3. Match any path component against patterns without slashes
+    if comp_re:
+        for part in parts:
+            if comp_re.match(part):
+                return True
 
     return False
 
@@ -258,9 +291,27 @@ def _iter_files(
         current_dir = Path(dirpath)
 
         # Prune excluded directories and symbolic links in-place so os.walk won't descend into them
-        dirnames[:] = [
-            d for d in dirnames if not _should_skip_dir(d) and not (current_dir / d).is_symlink()
-        ]
+        pruned_dirnames = []
+        for d in dirnames:
+            if _should_skip_dir(d):
+                continue
+
+            dir_path = current_dir / d
+            if dir_path.is_symlink():
+                continue
+
+            try:
+                rel_dir_path = str(dir_path.relative_to(root))
+            except ValueError:
+                continue
+
+            # Prune directories that match .gitignore rules
+            if _matches_gitignore(rel_dir_path, gitignore_patterns):
+                continue
+
+            pruned_dirnames.append(d)
+
+        dirnames[:] = pruned_dirnames
 
         for filename in filenames:
             filepath = current_dir / filename
