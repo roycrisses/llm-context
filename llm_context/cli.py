@@ -32,10 +32,20 @@ def _echo_error(msg: str) -> None:
 
 
 def _echo_info(msg: str) -> None:
+    # Use rocket emoji for network operations
+    if "Sending" in msg:
+        msg = f"🚀 {msg}"
     click.echo(click.style(msg, fg="cyan"), err=True)
 
 
 def _echo_success(msg: str) -> None:
+    # Use specific emojis based on the action
+    if "saved" in msg:
+        msg = f"💾 {msg}"
+    elif "copied" in msg:
+        msg = f"📋 {msg}"
+    else:
+        msg = f"✨ {msg}"
     click.echo(click.style(msg, fg="green"), err=True)
 
 
@@ -187,9 +197,6 @@ def main(
         _echo_error("Token budget is too small to include even one file.")
         sys.exit(1)
 
-    if verbose:
-        _echo_info(f"Including {len(trimmed)} file(s) in context.")
-
     # ── 4. Assemble ─────────────────────────────────────────────────────────
     try:
         context_block = build_context_block(trimmed, query=ask, model=model, max_tokens=max_tokens)
@@ -197,37 +204,51 @@ def main(
         _echo_error(str(exc))
         sys.exit(1)
 
-    # ── 5. Output ───────────────────────────────────────────────────────────
+    # ── 5. Summary ───────────────────────────────────────────────────────────
     tokens = context_token_count(context_block, model=model)
-    summary = f"Included {len(trimmed)} file(s) ({tokens:,} tokens)."
+    num_included = len(trimmed)
+    num_truncated = sum(1 for f in trimmed if f.get("truncated"))
+    num_omitted = len(files) - num_included
 
+    summary = f"Included {num_included} file(s)"
+    details = []
+    if num_truncated > 0:
+        details.append(f"{num_truncated} truncated")
+    if num_omitted > 0:
+        details.append(f"{num_omitted} omitted")
+
+    if details:
+        summary += f" ({', '.join(details)})"
+    summary += f" — {tokens:,} tokens total."
+
+    _echo_info(summary)
+
+    # ── 6. Output ───────────────────────────────────────────────────────────
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'. {summary}")
+            _echo_success(f"Context saved to '{output}'.")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
     elif not do_send:
         # Default: print to stdout
         click.echo(context_block)
-        _echo_info(summary)
 
     if do_copy:
         try:
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success(f"Context copied to clipboard. {summary}")
+            _echo_success("Context copied to clipboard.")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
             _echo_error(f"Clipboard copy failed: {exc}")
 
-    # ── 6. Send ─────────────────────────────────────────────────────────────
+    # ── 7. Send ─────────────────────────────────────────────────────────────
     if do_send:
-        if verbose:
-            _echo_info(f"Sending context to '{model}' …")
+        _echo_info(f"Sending context to '{model}' …")
 
         try:
             from llm_context.llm import send
