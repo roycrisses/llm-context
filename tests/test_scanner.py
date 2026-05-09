@@ -180,6 +180,8 @@ class TestScanDirectory:
             assert "size" in f
             assert "extension" in f
             assert "mtime" in f
+            assert "truncated" in f
+            assert f["truncated"] is False
 
     def test_content_is_string(self, tmp_project: Path):
         files = scan_directory(tmp_project)

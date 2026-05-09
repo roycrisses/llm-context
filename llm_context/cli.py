@@ -32,10 +32,18 @@ def _echo_error(msg: str) -> None:
 
 
 def _echo_info(msg: str) -> None:
+    if "Sending" in msg:
+        msg = f"🚀 {msg}"
     click.echo(click.style(msg, fg="cyan"), err=True)
 
 
 def _echo_success(msg: str) -> None:
+    if "saved" in msg:
+        msg = f"💾 {msg}"
+    elif "copied" in msg:
+        msg = f"📋 {msg}"
+    elif "Included" in msg:
+        msg = f"✨ {msg}"
     click.echo(click.style(msg, fg="green"), err=True)
 
 
@@ -199,26 +207,42 @@ def main(
 
     # ── 5. Output ───────────────────────────────────────────────────────────
     tokens = context_token_count(context_block, model=model)
-    summary = f"Included {len(trimmed)} file(s) ({tokens:,} tokens)."
+
+    n_included = len(trimmed)
+    n_truncated = sum(1 for f in trimmed if f.get("truncated"))
+    n_omitted = len(ranked) - n_included
+
+    summary = f"Included {n_included} file(s)"
+    details = []
+    if n_truncated > 0:
+        details.append(f"{n_truncated} truncated")
+    if n_omitted > 0:
+        details.append(f"{n_omitted} omitted")
+
+    if details:
+        summary += f" ({', '.join(details)})"
+    summary += f" ({tokens:,} tokens)."
+
+    # Always print summary to stderr
+    _echo_success(summary)
 
     if output:
         try:
             output.write_text(context_block, encoding="utf-8")
-            _echo_success(f"Context saved to '{output}'. {summary}")
+            _echo_success(f"Context saved to '{output}'.")
         except OSError as exc:
             _echo_error(f"Could not write to '{output}': {exc}")
             sys.exit(1)
     elif not do_send:
         # Default: print to stdout
         click.echo(context_block)
-        _echo_info(summary)
 
     if do_copy:
         try:
             import pyperclip  # type: ignore
 
             pyperclip.copy(context_block)
-            _echo_success(f"Context copied to clipboard. {summary}")
+            _echo_success("Context copied to clipboard.")
         except ImportError:
             _echo_error("pyperclip is not installed. Install with: pip install pyperclip")
         except Exception as exc:
@@ -226,8 +250,7 @@ def main(
 
     # ── 6. Send ─────────────────────────────────────────────────────────────
     if do_send:
-        if verbose:
-            _echo_info(f"Sending context to '{model}' …")
+        _echo_info(f"Sending context to '{model}' …")
 
         try:
             from llm_context.llm import send
