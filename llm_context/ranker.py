@@ -6,6 +6,7 @@ recently modified files.
 
 from __future__ import annotations
 
+import collections
 import math
 import os
 import re
@@ -20,6 +21,7 @@ from llm_context.scanner import FileInfo
 # ---------------------------------------------------------------------------
 
 _TOKEN_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_CAMEL_RE = re.compile(r"([a-z])([A-Z])")
 
 
 def _tokenize(text: str) -> List[str]:
@@ -29,28 +31,18 @@ def _tokenize(text: str) -> List[str]:
     """
     # 1. Expand camelCase: "getUserName" -> "get User Name"
     # Done before lowercasing so we can detect uppercase boundaries
-    expanded = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    expanded = _CAMEL_RE.sub(r"\1 \2", text)
 
     # 2. Treat underscores as delimiters: "get_user" -> "get user"
-    expanded = expanded.replace("_", " ")
-
-    # 3. Find all alphanumeric tokens
-    raw = _TOKEN_RE.findall(expanded.lower())
-
-    # 4. Include the original tokens if they were split
-    # (Re-matching on original text to get original tokens)
-    original_tokens = _TOKEN_RE.findall(text.lower())
-
-    # Using a list to preserve duplicates (important for TF)
-    return raw + original_tokens
+    # 3. Find all alphanumeric tokens for both expanded and original text
+    # Optimized: concatenate with space to perform one findall on lowercase text
+    combined_text = (expanded.replace("_", " ") + " " + text).lower()
+    return _TOKEN_RE.findall(combined_text)
 
 
-def _term_frequency(tokens: List[str]) -> dict[str, float]:
+def _term_frequency(tokens: List[str]) -> dict[str, int]:
     """Return a dict of term → raw count for *tokens*."""
-    tf: dict[str, float] = {}
-    for tok in tokens:
-        tf[tok] = tf.get(tok, 0) + 1
-    return tf
+    return collections.Counter(tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -76,19 +68,16 @@ def _compute_tfidf_scores(
     if n_docs == 0:
         return []
 
-    # Tokenize documents (path + content)
-    doc_tokens: List[List[str]] = []
-    doc_sets: List[set[str]] = []
+    # Tokenize documents (path + content) and pre-calculate TFs
+    doc_data: List[tuple[dict[str, int], int]] = []
     for f in files:
         tokens = _tokenize(f["rel_path"] + " " + f["content"])
-        doc_tokens.append(tokens)
-        doc_sets.append(set(tokens))
+        doc_data.append((_term_frequency(tokens), max(len(tokens), 1)))
 
     # 1. Document frequency for query terms only
-    # Optimization: use sets for O(1) lookup during DF calculation
     df: dict[str, int] = {}
     for term in query_terms:
-        count = sum(1 for s in doc_sets if term in s)
+        count = sum(1 for tf, _ in doc_data if term in tf)
         df[term] = count
 
     # 2. Pre-calculate IDFs for query terms
@@ -99,9 +88,7 @@ def _compute_tfidf_scores(
 
     # 3. Score each document
     scores: List[float] = []
-    for tokens in doc_tokens:
-        tf_counts = _term_frequency(tokens)
-        doc_len = max(len(tokens), 1)
+    for tf_counts, doc_len in doc_data:
         score = 0.0
         for term in query_terms:
             count = tf_counts.get(term, 0)
@@ -126,7 +113,7 @@ def _filename_boost(rel_path: str, query_terms: List[str]) -> float:
     query keywords.  Prioritises exact stem matches.
     """
     stem = os.path.splitext(os.path.basename(rel_path))[0].lower()
-    stem_tokens = _tokenize(stem)
+    stem_tokens = set(_tokenize(stem))
     hits = sum(1 for t in query_terms if t in stem_tokens)
     return 0.15 * hits
 
