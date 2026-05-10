@@ -1,3 +1,7 @@
 ## 2025-05-15 - TF-IDF Optimization and Tokenization
 **Learning:** Document Frequency (DF) calculation was previously O(Q * N * L), where Q is query terms, N is number of files, and L is average file length. By pre-calculating token sets for each document, DF calculation becomes O(Q * N), which is significantly faster for large codebases. Additionally, processing string replacements and regex expansions on the full text *before* tokenization is much more efficient than doing it per-token in a loop.
 **Action:** Use sets for document existence checks and perform bulk string operations outside of tight token loops.
+
+## 2025-05-22 - Optimized Gitignore Matching with Cached Regex
+**Learning:** The original gitignore matching performed O(N_files * N_patterns) fnmatch calls, which is extremely slow for large repositories or large gitignore files. By combining all patterns into a single, cached regular expression, we reduced the time complexity to O(N_files) for the matching phase. However, care must be taken to correctly handle component matching (e.g., matching a directory anywhere in the path) by carefully crafting the regex to match `(?:^|.*/)core(?:/.*|$)` and stripping anchors from `fnmatch.translate` outputs.
+**Action:** Use cached, combined regular expressions for batch path matching instead of repeated glob matches. Always verify regex correctness against complex path components.

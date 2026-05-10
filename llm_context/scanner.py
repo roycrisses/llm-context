@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import fnmatch
 import os
+import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterator, List, Optional, TypedDict
 
@@ -167,32 +169,81 @@ def _load_gitignore_patterns(root: Path) -> List[str]:
     return patterns
 
 
+@lru_cache(maxsize=1)
+def _compile_gitignore_regex(patterns_tuple: tuple[str, ...]) -> Optional[re.Pattern]:
+    """
+    Compile a list of gitignore patterns into a single regex for fast matching.
+    """
+    if not patterns_tuple:
+        return None
+
+    regex_parts = []
+    for pattern in patterns_tuple:
+        # Strip trailing slash
+        pat = pattern.rstrip("/")
+        # Escape for regex (simple version of fnmatch.translate but without anchors)
+        # We use fnmatch.translate and then strip the anchors to be safer
+        translated = fnmatch.translate(pat)
+        # Remove the \Z or $ anchors and any flags like (?s:...)
+        # fnmatch.translate output varies by version, e.g. '(?s:foo)\\Z' or 'foo\\Z(?ms)'
+        # We want the core regex: 'foo'
+        core = translated
+        if core.startswith("(?s:"):
+            core = core[4:]
+        if core.endswith(")\\Z"):
+            core = core[:-3]
+        elif core.endswith("\\Z(?ms)"):
+            core = core[:-7]
+        elif core.endswith("\\Z"):
+            core = core[:-2]
+
+        # 1. Match full path or start of path: ^core($|/)
+        # 2. Match as a component: /core($|/)
+        # 3. Match with **/ prefix: .*/core($|/)
+
+        # This covers all cases from the original loop:
+        # - fnmatch.fnmatch(rel_path, pat) -> ^core$
+        # - fnmatch.fnmatch(rel_path, f"**/{pat}") -> (.*)?/core$
+        # - fnmatch.fnmatch(basename, pat) -> (.*)?/core$
+        # - for part in parts: fnmatch.fnmatch(part, pat) -> (.*)?/core(/.*)?
+
+        regex_parts.append(f"(?:^|.*/){core}(?:/.*|$)")
+
+    combined = f"^(?:{'|'.join(regex_parts)})$"
+    try:
+        return re.compile(combined, re.DOTALL)
+    except re.error:
+        return None
+
+
 def _matches_gitignore(rel_path: str, patterns: List[str]) -> bool:
     """
     Return True if *rel_path* matches any of the .gitignore *patterns*.
-    Uses fnmatch for glob-style matching and also checks plain basename.
+    Uses a compiled regex for speed.
     """
+    if not patterns:
+        return False
+
+    regex = _compile_gitignore_regex(tuple(patterns))
+    if regex:
+        return bool(regex.match(rel_path))
+
+    # Fallback to slow method if regex compilation failed
     parts = Path(rel_path).parts
     basename = parts[-1] if parts else rel_path
 
     for pattern in patterns:
-        # Strip trailing slash (directory-only marker) for matching
         pat = pattern.rstrip("/")
-
-        # Match against full relative path or just the basename
         if fnmatch.fnmatch(rel_path, pat):
             return True
         if fnmatch.fnmatch(rel_path, f"**/{pat}"):
             return True
         if fnmatch.fnmatch(basename, pat):
             return True
-
-        # Match any path component against directory patterns
         if "/" not in pat:
             for part in parts:
                 if fnmatch.fnmatch(part, pat):
                     return True
-
     return False
 
 
