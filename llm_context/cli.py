@@ -32,10 +32,18 @@ def _echo_error(msg: str) -> None:
 
 
 def _echo_info(msg: str) -> None:
+    if "Sending" in msg:
+        msg = f"🚀 {msg}"
     click.echo(click.style(msg, fg="cyan"), err=True)
 
 
 def _echo_success(msg: str) -> None:
+    if "saved" in msg.lower():
+        msg = f"💾 {msg}"
+    elif "copied" in msg.lower():
+        msg = f"📋 {msg}"
+    else:
+        msg = f"✨ {msg}"
     click.echo(click.style(msg, fg="green"), err=True)
 
 
@@ -199,7 +207,17 @@ def main(
 
     # ── 5. Output ───────────────────────────────────────────────────────────
     tokens = context_token_count(context_block, model=model)
-    summary = f"Included {len(trimmed)} file(s) ({tokens:,} tokens)."
+    num_truncated = sum(1 for f in trimmed if f.get("truncated"))
+    num_omitted = len(ranked) - len(trimmed)
+
+    details = []
+    if num_truncated > 0:
+        details.append(f"{num_truncated} truncated")
+    if num_omitted > 0:
+        details.append(f"{num_omitted} omitted")
+
+    details_str = f" ({', '.join(details)})" if details else ""
+    summary = f"Included {len(trimmed)} file(s){details_str} ({tokens:,} tokens)."
 
     if output:
         try:
@@ -226,8 +244,7 @@ def main(
 
     # ── 6. Send ─────────────────────────────────────────────────────────────
     if do_send:
-        if verbose:
-            _echo_info(f"Sending context to '{model}' …")
+        _echo_info(f"Sending context to '{model}' …")
 
         try:
             from llm_context.llm import send
