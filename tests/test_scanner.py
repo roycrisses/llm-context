@@ -244,3 +244,40 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_security_exclusions(self, tmp_path: Path):
+        """Verify that sensitive files are excluded from the scan."""
+        # Sensitive files that should be excluded
+        sensitive_files = [
+            "id_rsa",
+            "id_ecdsa",
+            "id_ed25519",
+            "id_dsa",
+            ".env.secret",
+            ".env.production",
+            ".npmrc",
+            ".netrc",
+            ".htpasswd",
+            "private.key",
+            "cert.pem",
+            "secrets.gpg",
+        ]
+
+        # Safe files that should be included
+        safe_files = [
+            "main.py",
+            "README.md",
+            ".env.example",
+        ]
+
+        for f in sensitive_files + safe_files:
+            (tmp_path / f).write_text("content", encoding="utf-8")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        for f in sensitive_files:
+            assert f not in rel_paths, f"{f} should be excluded"
+
+        for f in safe_files:
+            assert f in rel_paths, f"{f} should be included"
