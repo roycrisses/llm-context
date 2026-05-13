@@ -20,6 +20,7 @@ from llm_context.scanner import FileInfo
 # ---------------------------------------------------------------------------
 
 _TOKEN_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_CAMEL_RE = re.compile(r"([a-z])([A-Z])")
 
 
 def _tokenize(text: str) -> List[str]:
@@ -29,7 +30,7 @@ def _tokenize(text: str) -> List[str]:
     """
     # 1. Expand camelCase: "getUserName" -> "get User Name"
     # Done before lowercasing so we can detect uppercase boundaries
-    expanded = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    expanded = _CAMEL_RE.sub(r"\1 \2", text)
 
     # 2. Treat underscores as delimiters: "get_user" -> "get user"
     expanded = expanded.replace("_", " ")
@@ -43,14 +44,6 @@ def _tokenize(text: str) -> List[str]:
 
     # Using a list to preserve duplicates (important for TF)
     return raw + original_tokens
-
-
-def _term_frequency(tokens: List[str]) -> dict[str, float]:
-    """Return a dict of term → raw count for *tokens*."""
-    tf: dict[str, float] = {}
-    for tok in tokens:
-        tf[tok] = tf.get(tok, 0) + 1
-    return tf
 
 
 # ---------------------------------------------------------------------------
@@ -68,46 +61,48 @@ def _compute_tfidf_scores(
 
     Strategy
     --------
-    1. Build a per-file token list from ``rel_path + content``.
-    2. Compute document frequency for each query term across all docs.
-    3. Score each doc as the sum of ``tf * idf`` for every query term.
+    1. Single pass over files to compute TF for query terms and DF.
+    2. Score each doc as the sum of ``tf * idf`` for every query term.
     """
     n_docs = len(files)
     if n_docs == 0:
         return []
 
-    # Tokenize documents (path + content)
-    doc_tokens: List[List[str]] = []
-    doc_sets: List[set[str]] = []
+    query_set = set(query_terms)
+    # doc_tfs stores TF counts only for query terms to save memory
+    doc_tfs: List[dict[str, int]] = []
+    doc_lens: List[int] = []
+    df: dict[str, int] = {term: 0 for term in query_terms}
+
+    # 1. Single pass: tokenize and count TF/DF (only for query terms)
+    # Optimization: Reduces memory by not storing all tokens for all files
     for f in files:
         tokens = _tokenize(f["rel_path"] + " " + f["content"])
-        doc_tokens.append(tokens)
-        doc_sets.append(set(tokens))
+        doc_lens.append(max(len(tokens), 1))
 
-    # 1. Document frequency for query terms only
-    # Optimization: use sets for O(1) lookup during DF calculation
-    df: dict[str, int] = {}
-    for term in query_terms:
-        count = sum(1 for s in doc_sets if term in s)
-        df[term] = count
+        # Only count terms that are in the query
+        tf: dict[str, int] = {}
+        for tok in tokens:
+            if tok in query_set:
+                tf[tok] = tf.get(tok, 0) + 1
+        doc_tfs.append(tf)
+
+        # Update document frequency
+        for term in tf:
+            df[term] += 1
 
     # 2. Pre-calculate IDFs for query terms
-    idfs: dict[str, float] = {}
-    for term in query_terms:
-        # Smoothed IDF
-        idfs[term] = math.log((n_docs + 1) / (df[term] + 1)) + 1.0
+    idfs: dict[str, float] = {
+        term: math.log((n_docs + 1) / (df[term] + 1)) + 1.0 for term in query_terms
+    }
 
     # 3. Score each document
     scores: List[float] = []
-    for tokens in doc_tokens:
-        tf_counts = _term_frequency(tokens)
-        doc_len = max(len(tokens), 1)
+    for tf, doc_len in zip(doc_tfs, doc_lens):
         score = 0.0
-        for term in query_terms:
-            count = tf_counts.get(term, 0)
-            if count > 0:
-                # Normalised TF * Pre-calculated IDF
-                score += (count / doc_len) * idfs[term]
+        for term, count in tf.items():
+            # Normalised TF * Pre-calculated IDF
+            score += (count / doc_len) * idfs[term]
         scores.append(score)
 
     return scores
@@ -125,9 +120,10 @@ def _filename_boost(rel_path: str, query_terms: List[str]) -> float:
     Return a small additive boost when the file name contains one or more
     query keywords.  Prioritises exact stem matches.
     """
+    query_set = set(query_terms)
     stem = os.path.splitext(os.path.basename(rel_path))[0].lower()
     stem_tokens = _tokenize(stem)
-    hits = sum(1 for t in query_terms if t in stem_tokens)
+    hits = sum(1 for t in stem_tokens if t in query_set)
     return 0.15 * hits
 
 
