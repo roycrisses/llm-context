@@ -86,6 +86,8 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
         except Exception:
             pass
     # Fallback: 1 token ≈ 4 characters (commonly cited rule of thumb)
+    if not text:
+        return 0
     return max(1, len(text) // 4)
 
 
