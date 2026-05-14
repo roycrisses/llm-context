@@ -45,14 +45,6 @@ def _tokenize(text: str) -> List[str]:
     return raw + original_tokens
 
 
-def _term_frequency(tokens: List[str]) -> dict[str, float]:
-    """Return a dict of term → raw count for *tokens*."""
-    tf: dict[str, float] = {}
-    for tok in tokens:
-        tf[tok] = tf.get(tok, 0) + 1
-    return tf
-
-
 # ---------------------------------------------------------------------------
 # TF-IDF scorer
 # ---------------------------------------------------------------------------
@@ -76,39 +68,33 @@ def _compute_tfidf_scores(
     if n_docs == 0:
         return []
 
-    # Tokenize documents (path + content)
-    doc_tokens: List[List[str]] = []
-    doc_sets: List[set[str]] = []
+    query_terms_set = set(query_terms)
+    df: dict[str, int] = {term: 0 for term in query_terms}
+    doc_tokens_list: List[List[str]] = []
+
+    # Optimization: Tokenize and compute Document Frequency (DF) in a single pass
     for f in files:
         tokens = _tokenize(f["rel_path"] + " " + f["content"])
-        doc_tokens.append(tokens)
-        doc_sets.append(set(tokens))
+        doc_tokens_list.append(tokens)
 
-    # 1. Document frequency for query terms only
-    # Optimization: use sets for O(1) lookup during DF calculation
-    df: dict[str, int] = {}
-    for term in query_terms:
-        count = sum(1 for s in doc_sets if term in s)
-        df[term] = count
+        # Count each query term at most once per document for DF
+        doc_set = set(tokens)
+        for term in query_terms_set:
+            if term in doc_set:
+                df[term] += 1
 
-    # 2. Pre-calculate IDFs for query terms
-    idfs: dict[str, float] = {}
-    for term in query_terms:
-        # Smoothed IDF
-        idfs[term] = math.log((n_docs + 1) / (df[term] + 1)) + 1.0
+    # Pre-calculate IDFs for query terms
+    idfs: dict[str, float] = {
+        term: math.log((n_docs + 1) / (df[term] + 1)) + 1.0 for term in query_terms
+    }
 
-    # 3. Score each document
+    # Score each document: iterate tokens once and sum IDFs of matches
+    # Mathematically equivalent to (count / doc_len) * idf summed over query terms
     scores: List[float] = []
-    for tokens in doc_tokens:
-        tf_counts = _term_frequency(tokens)
+    for tokens in doc_tokens_list:
         doc_len = max(len(tokens), 1)
-        score = 0.0
-        for term in query_terms:
-            count = tf_counts.get(term, 0)
-            if count > 0:
-                # Normalised TF * Pre-calculated IDF
-                score += (count / doc_len) * idfs[term]
-        scores.append(score)
+        score = sum(idfs[t] for t in tokens if t in idfs)
+        scores.append(score / doc_len)
 
     return scores
 
