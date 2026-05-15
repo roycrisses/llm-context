@@ -14,6 +14,7 @@ Uses tiktoken when available; falls back to the chars / 4 heuristic.
 
 from __future__ import annotations
 
+import functools
 from typing import List, Optional
 
 from llm_context.scanner import FileInfo
@@ -41,10 +42,14 @@ _OVERHEAD_TOKENS = 512
 # ---------------------------------------------------------------------------
 
 
+@functools.lru_cache(maxsize=32)
 def _get_tiktoken_encoder(model: str):
     """
     Return a tiktoken encoder for *model*, or None if tiktoken is not
     installed or the model is not supported.
+
+    Caching the encoder significantly improves performance by avoiding
+    repeated import attempts and redundant encoding lookups during loops.
     """
     try:
         import tiktoken
@@ -79,12 +84,16 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
     int
         Estimated token count.
     """
+    if not text:
+        return 0
+
     enc = _get_tiktoken_encoder(model)
     if enc is not None:
         try:
             return len(enc.encode(text))
         except Exception:
             pass
+
     # Fallback: 1 token ≈ 4 characters (commonly cited rule of thumb)
     return max(1, len(text) // 4)
 
