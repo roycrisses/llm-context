@@ -106,6 +106,16 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "pyc",
         "pyo",
         "class",
+        # Security / Credentials
+        "pem",
+        "key",
+        "crt",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
     }
 )
 
@@ -130,6 +140,16 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        # SSH / Credentials
+        "id_rsa",
+        "id_dsa",
+        "id_ed25519",
+        "id_ecdsa",
+        "authorized_keys",
+        "known_hosts",
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
     }
 )
 
@@ -264,7 +284,8 @@ def _iter_files(
 
         for filename in filenames:
             filepath = current_dir / filename
-            if filepath.is_symlink():
+            # Skip symlinks and non-regular files (FIFOs, sockets, devices) to prevent DoS/hangs
+            if filepath.is_symlink() or not filepath.is_file():
                 continue
 
             try:

@@ -244,3 +244,35 @@ class TestScanDirectory:
         assert "normal.txt" in rel_paths
         assert ".bash_history" not in rel_paths
         assert ".zsh_history" not in rel_paths
+
+    def test_skips_non_regular_files(self, tmp_path: Path):
+        import os
+        fifo_path = tmp_path / "my_fifo"
+        try:
+            os.mkfifo(fifo_path)
+        except AttributeError:
+            pytest.skip("FIFOs not supported on this platform")
+
+        (tmp_path / "regular.txt").write_text("content")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "regular.txt" in rel_paths
+        assert "my_fifo" not in rel_paths
+
+    def test_excludes_sensitive_files(self, tmp_path: Path):
+        (tmp_path / "id_rsa").write_text("private key")
+        (tmp_path / "cert.pem").write_text("certificate")
+        (tmp_path / "authorized_keys").write_text("keys")
+        (tmp_path / ".npmrc").write_text("config")
+        (tmp_path / "normal.py").write_text("print(1)")
+
+        files = scan_directory(tmp_path)
+        rel_paths = [f["rel_path"] for f in files]
+
+        assert "normal.py" in rel_paths
+        assert "id_rsa" not in rel_paths
+        assert "cert.pem" not in rel_paths
+        assert "authorized_keys" not in rel_paths
+        assert ".npmrc" not in rel_paths
