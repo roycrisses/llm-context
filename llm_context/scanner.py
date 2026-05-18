@@ -106,6 +106,20 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "pyc",
         "pyo",
         "class",
+        # Security / sensitive
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
+        # Database backups
+        "sql",
+        "bak",
+        "dump",
     }
 )
 
@@ -130,6 +144,15 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ecdsa_sk",
+        "id_ed25519",
+        "id_ed25519_sk",
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
     }
 )
 
@@ -216,6 +239,7 @@ def _should_skip_file(
     """
     Return True if a file should be excluded from the scan based on:
       - Hardcoded exclusion lists
+      - Prefix checks (e.g. .env files)
       - .gitignore patterns
       - User-supplied extra exclusion globs
     """
@@ -223,6 +247,11 @@ def _should_skip_file(
         return True
     if ext in _EXCLUDED_EXTENSIONS:
         return True
+
+    # Exclude all .env files (e.g. .env.staging, .env.local) except .env.example
+    if filename.startswith(".env") and filename != ".env.example":
+        return True
+
     if _matches_gitignore(rel_path, gitignore_patterns):
         return True
     if extra_excludes:
