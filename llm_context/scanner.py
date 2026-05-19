@@ -95,13 +95,26 @@ _EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
         "woff",
         "woff2",
         "eot",
-        # Lock / generated
-        "lock",
-        "map",
+        # Security / sensitive
+        "pem",
+        "crt",
+        "key",
+        "p12",
+        "pfx",
+        "gpg",
+        "pub",
+        "sig",
+        "asc",
         # DB / binary data
         "db",
         "sqlite",
         "sqlite3",
+        "sql",
+        "bak",
+        "dump",
+        # Lock / generated
+        "lock",
+        "map",
         # Compiled
         "pyc",
         "pyo",
@@ -130,6 +143,17 @@ _EXCLUDED_FILENAMES: frozenset[str] = frozenset(
         ".history",
         ".python_history",
         ".node_repl_history",
+        # SSH keys
+        "id_rsa",
+        "id_ecdsa",
+        "id_ecdsa_sk",
+        "id_ed25519",
+        "id_ed25519_sk",
+        "id_dsa",
+        # Config / secrets
+        ".npmrc",
+        ".netrc",
+        ".htpasswd",
     }
 )
 
@@ -219,6 +243,10 @@ def _should_skip_file(
       - .gitignore patterns
       - User-supplied extra exclusion globs
     """
+    # Specifically exclude all .env files (except .env.example) to avoid leaking secrets
+    if filename.startswith(".env") and filename != ".env.example":
+        return True
+
     if filename in _EXCLUDED_FILENAMES:
         return True
     if ext in _EXCLUDED_EXTENSIONS:
