@@ -14,6 +14,7 @@ Uses tiktoken when available; falls back to the chars / 4 heuristic.
 
 from __future__ import annotations
 
+import functools
 from typing import List, Optional
 
 from llm_context.scanner import FileInfo
@@ -33,7 +34,7 @@ MODEL_TOKEN_LIMITS: dict[str, int] = {
 
 _DEFAULT_MODEL = "gpt-4o"
 # Tokens reserved for the context header/footer and the model's answer
-_OVERHEAD_TOKENS = 512
+_OVERHEAD_TOKENS = 64
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +42,7 @@ _OVERHEAD_TOKENS = 512
 # ---------------------------------------------------------------------------
 
 
+@functools.lru_cache(maxsize=32)
 def _get_tiktoken_encoder(model: str):
     """
     Return a tiktoken encoder for *model*, or None if tiktoken is not
@@ -86,6 +88,8 @@ def count_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
         except Exception:
             pass
     # Fallback: 1 token ≈ 4 characters (commonly cited rule of thumb)
+    if not text:
+        return 0
     return max(1, len(text) // 4)
 
 
