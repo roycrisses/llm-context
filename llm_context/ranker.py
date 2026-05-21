@@ -45,14 +45,6 @@ def _tokenize(text: str) -> List[str]:
     return raw + original_tokens
 
 
-def _term_frequency(tokens: List[str]) -> dict[str, float]:
-    """Return a dict of term → raw count for *tokens*."""
-    tf: dict[str, float] = {}
-    for tok in tokens:
-        tf[tok] = tf.get(tok, 0) + 1
-    return tf
-
-
 # ---------------------------------------------------------------------------
 # TF-IDF scorer
 # ---------------------------------------------------------------------------
@@ -68,46 +60,49 @@ def _compute_tfidf_scores(
 
     Strategy
     --------
-    1. Build a per-file token list from ``rel_path + content``.
-    2. Compute document frequency for each query term across all docs.
-    3. Score each doc as the sum of ``tf * idf`` for every query term.
+    1. Tokenize each file once, counting only keywords from the query.
+    2. Compute document frequency (DF) and IDFs for query terms.
+    3. Score each doc using normalized TF * IDF.
     """
     n_docs = len(files)
     if n_docs == 0:
         return []
 
-    # Tokenize documents (path + content)
-    doc_tokens: List[List[str]] = []
-    doc_sets: List[set[str]] = []
+    # Optimization: single-pass tokenization to collect TF and DF simultaneously.
+    # This avoids storing full token lists for every document in memory.
+    df: dict[str, int] = {term: 0 for term in query_terms}
+    doc_stats: List[tuple[int, dict[str, int]]] = []
+
     for f in files:
         tokens = _tokenize(f["rel_path"] + " " + f["content"])
-        doc_tokens.append(tokens)
-        doc_sets.append(set(tokens))
+        doc_len = len(tokens)
 
-    # 1. Document frequency for query terms only
-    # Optimization: use sets for O(1) lookup during DF calculation
-    df: dict[str, int] = {}
-    for term in query_terms:
-        count = sum(1 for s in doc_sets if term in s)
-        df[term] = count
+        # Only count frequencies for terms present in the query
+        counts: dict[str, int] = {}
+        found_in_doc = set()
 
-    # 2. Pre-calculate IDFs for query terms
+        for tok in tokens:
+            if tok in df: # O(1) lookup in query term dict
+                counts[tok] = counts.get(tok, 0) + 1
+                if tok not in found_in_doc:
+                    df[tok] += 1
+                    found_in_doc.add(tok)
+
+        doc_stats.append((max(doc_len, 1), counts))
+
+    # Pre-calculate IDFs for query terms
     idfs: dict[str, float] = {}
     for term in query_terms:
-        # Smoothed IDF
+        # Smoothed IDF: log((N+1)/(DF+1)) + 1
         idfs[term] = math.log((n_docs + 1) / (df[term] + 1)) + 1.0
 
-    # 3. Score each document
+    # Score each document
     scores: List[float] = []
-    for tokens in doc_tokens:
-        tf_counts = _term_frequency(tokens)
-        doc_len = max(len(tokens), 1)
+    for doc_len, counts in doc_stats:
         score = 0.0
-        for term in query_terms:
-            count = tf_counts.get(term, 0)
-            if count > 0:
-                # Normalised TF * Pre-calculated IDF
-                score += (count / doc_len) * idfs[term]
+        for term, count in counts.items():
+            # Normalised TF * Pre-calculated IDF
+            score += (count / doc_len) * idfs[term]
         scores.append(score)
 
     return scores
@@ -126,7 +121,8 @@ def _filename_boost(rel_path: str, query_terms: List[str]) -> float:
     query keywords.  Prioritises exact stem matches.
     """
     stem = os.path.splitext(os.path.basename(rel_path))[0].lower()
-    stem_tokens = _tokenize(stem)
+    # Optimization: use a set for O(1) keyword lookups
+    stem_tokens = set(_tokenize(stem))
     hits = sum(1 for t in query_terms if t in stem_tokens)
     return 0.15 * hits
 
